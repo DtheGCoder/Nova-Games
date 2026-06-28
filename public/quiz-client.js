@@ -189,8 +189,9 @@ function renderPlay(room, reveal) {
     vm.classList.remove('hidden');
     if (vm._v !== room.question.yt) {
       vm._v = room.question.yt; const id = encodeURIComponent(room.question.yt);
-      vm.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1" title="Video" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` +
-        `<a class="q-video-fallback" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">▶ Auf YouTube ansehen</a>`;
+      vm.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=0" title="Video" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` +
+        `<div class="q-video-cover"></div>` +
+        `<a class="q-video-fallback" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">▶ YouTube</a>`;
     }
   } else { vm.classList.add('hidden'); vm._v = null; vm.innerHTML = ''; }
   // 50:50 for mc, emoji & video
