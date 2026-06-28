@@ -551,4 +551,21 @@ const VIDEO = [
   { c:'musik', d:2, yt:'dQw4w9WgXcQ', q:'Aus welchem Jahrzehnt stammt dieser Song?', a:['70er','80er','90er','2000er'], k:1 },
 ];
 
-module.exports = { TF, EST, LISTS, EMOJI, VIDEO };
+/* ===== INTRO guessing (first seconds of a series/cartoon opening) =====
+   yt = YouTube id. Plays muted from start to `end` seconds. Guess the show.
+   IDs from official channels (Nick, Pokémon, HBO, Netflix, Cartoon Network …). */
+const INTRO = [
+  { c:'film', d:1, yt:'r9L4AseD-aA', end:9, q:'Welche Serie ist das?', a:['SpongeBob Schwammkopf','Adventure Time','Gravity Falls','Phineas und Ferb'], k:0 },
+  { c:'film', d:1, yt:'R4GIyJxvk94', end:9, q:'Welche Serie ist das?', a:['Digimon','Pokémon','Yu-Gi-Oh!','Beyblade'], k:1 },
+  { c:'film', d:1, yt:'aPzS3QYb868', end:9, q:'Welche Serie ist das?', a:['Family Guy','Die Simpsons','Futurama','South Park'], k:1 },
+  { c:'film', d:2, yt:'NpnQ2oIRgB0', end:10, q:'Welche Serie ist das?', a:['Friends','Der Prinz von Bel-Air','Two and a Half Men','How I Met Your Mother'], k:1 },
+  { c:'film', d:2, yt:'Niu9Zmrx0p8', end:9, q:'Welche Serie ist das?', a:['Friends','Seinfeld','The Big Bang Theory','New Girl'], k:0 },
+  { c:'film', d:2, yt:'s7L2PVdrb_8', end:10, q:'Welche Serie ist das?', a:['Vikings','Game of Thrones','The Witcher','The Last Kingdom'], k:1 },
+  { c:'film', d:1, yt:'04WIdoIPjbI', end:9, q:'Welche Serie ist das?', a:['Feuerwehrmann Sam','PAW Patrol','Bob der Baumeister','Peppa Wutz'], k:1 },
+  { c:'film', d:1, yt:'wulejb3mZK0', end:9, q:'Welche Serie ist das?', a:['Peppa Wutz','PAW Patrol','Bluey','Caillou'], k:0 },
+  { c:'film', d:2, yt:'-RcPZdihrp4', end:9, q:'Welche Serie ist das?', a:['Dark','Stranger Things','The OA','Wednesday'], k:1 },
+  { c:'film', d:2, yt:'d1EnW4kn1kg', end:9, q:'Welche Serie ist das?', a:['Naruto','Avatar – Der Herr der Elemente','Dragon Ball','One Piece'], k:1 },
+  { c:'film', d:2, yt:'cvDxko2Zm0Q', end:9, q:'Welche Serie ist das?', a:['Adventure Time','Gravity Falls','Steven Universe','Regular Show'], k:0 },
+];
+
+module.exports = { TF, EST, LISTS, EMOJI, VIDEO, INTRO };
