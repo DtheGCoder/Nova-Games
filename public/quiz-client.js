@@ -81,7 +81,7 @@ function joinQuiz() {
     else { const m = { no_room: 'Raum nicht gefunden', full: 'Raum voll', already_in: 'Schon im Raum', broke: 'Zu wenig Geld' }; $('#q-enter-error').textContent = (res && (m[res.error] || res.message)) || 'Fehlgeschlagen'; }
   });
 }
-function enterQuiz() { N.showScreen('screen-quiz'); if (Q.room) render(); }
+function enterQuiz() { N.showScreen('screen-quiz'); try { ensureYTApi(); } catch (e) {} if (Q.room) render(); }
 
 /* ============================ HELPERS ============================ */
 function myP() { return Q.room ? Q.room.players.find(p => p.id === Q.me) : null; }
@@ -171,25 +171,33 @@ $('#q-wager-slider').addEventListener('change', e => setWager(+e.target.value));
 $('#q-pu-double-w').addEventListener('click', () => { socket.emit('quiz:powerup', { type: 'double' }); Sound.chip(); });
 
 /* ---- audio-only player via YouTube IFrame API (invisible player, our own button) ---- */
-let _ytAudio = null;
+let _ytAudio = null, _ytReady = false, _ytWantPlay = false, _ytBtn = null;
 function ensureYTApi(cb) {
-  if (window.YT && window.YT.Player) return cb();
+  if (window.YT && window.YT.Player) return cb && cb();
   if (!document.getElementById('yt-iframe-api')) { const s = document.createElement('script'); s.id = 'yt-iframe-api'; s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); }
-  let n = 0; const t = setInterval(() => { if (window.YT && window.YT.Player) { clearInterval(t); cb(); } else if (++n > 80) clearInterval(t); }, 150);
+  let n = 0; const t = setInterval(() => { if (window.YT && window.YT.Player) { clearInterval(t); cb && cb(); } else if (++n > 120) clearInterval(t); }, 120);
 }
-function audioDestroy() { if (_ytAudio) { try { _ytAudio.destroy(); } catch (e) {} _ytAudio = null; } }
+function audioDestroy() { _ytReady = false; _ytWantPlay = false; if (_ytAudio) { try { _ytAudio.destroy(); } catch (e) {} _ytAudio = null; } }
+function audioPlay() { if (!_ytAudio) return; try { _ytAudio.unMute(); _ytAudio.setVolume(100); _ytAudio.playVideo(); } catch (e) {} if (_ytBtn) _ytBtn.textContent = '⏸ Pause'; }
 function audioSetup(id) {
   audioDestroy();
   ensureYTApi(() => {
     if (!document.getElementById('q-yt-audio')) return;
-    try { _ytAudio = new YT.Player('q-yt-audio', { width: '100%', height: '100%', videoId: id, playerVars: { playsinline: 1, controls: 0, rel: 0, fs: 0, modestbranding: 1 }, events: {} }); } catch (e) {}
+    try {
+      _ytAudio = new YT.Player('q-yt-audio', {
+        width: '100%', height: '100%', videoId: id,
+        playerVars: { playsinline: 1, controls: 0, rel: 0, fs: 0, modestbranding: 1 },
+        events: { onReady: () => { _ytReady = true; if (_ytWantPlay) audioPlay(); } },
+      });
+    } catch (e) {}
   });
 }
 function audioToggle(btn) {
-  if (!_ytAudio || !_ytAudio.getPlayerState) return;
+  _ytBtn = btn;
+  if (!_ytReady || !_ytAudio || !_ytAudio.getPlayerState) { _ytWantPlay = true; if (btn) btn.textContent = '⏳ lädt…'; return; }
   let st = -1; try { st = _ytAudio.getPlayerState(); } catch (e) {}
   if (st === 1) { try { _ytAudio.pauseVideo(); } catch (e) {} if (btn) btn.textContent = '▶ Weiter'; }
-  else { try { _ytAudio.unMute(); _ytAudio.setVolume(100); _ytAudio.playVideo(); } catch (e) {} if (btn) btn.textContent = '⏸ Pause'; }
+  else audioPlay();
 }
 
 function renderPlay(room, reveal) {
@@ -250,7 +258,7 @@ function renderPlay(room, reveal) {
   if (me) {
     $('#q-pu-fifty-n').textContent = me.powerups ? me.powerups.fifty : 0;
     $('#q-pu-double-n').textContent = me.doubleActive ? '✓' : (me.powerups ? me.powerups.double : 0);
-    $('#q-pu-fifty').disabled = reveal || blocked || type !== 'mc' || !me.powerups || me.powerups.fifty <= 0;
+    $('#q-pu-fifty').disabled = reveal || blocked || !['mc', 'emoji', 'video', 'intro', 'audio'].includes(type) || !me.powerups || me.powerups.fifty <= 0;
     $('#q-pu-double').disabled = reveal || !me.powerups || me.powerups.double <= 0 || me.doubleActive || me.locked || me.spectator || me.eliminated;
     $('#q-pu-double').classList.toggle('armed', me.doubleActive);
     $('#q-play-wager').textContent = fmt(me.wager || 0);
@@ -272,8 +280,11 @@ function revealMissText(type, me) {
 function renderOptions(room, reveal, me, type) {
   const grid = $('#q-options');
   grid.classList.toggle('two', type === 'tf');
-  if (grid._q !== room.question.q) {
-    grid._q = room.question.q; grid.innerHTML = '';
+  // rebuild whenever the actual options/media/round change — NOT just the question text
+  // (many media questions share the same text like "Welche Serie ist das?")
+  const sig = room.round + '¦' + (room.question.options || []).join('¦') + '¦' + (room.question.yt || room.question.emoji || '');
+  if (grid._sig !== sig) {
+    grid._sig = sig; grid.innerHTML = '';
     (room.question.options || []).forEach((opt, i) => {
       const b = document.createElement('button'); b.className = 'q-opt'; b.dataset.i = i;
       b.innerHTML = `<span class="ol">${type === 'tf' ? (i === 0 ? '✓' : '✗') : 'ABCD'[i]}</span><span class="ot">${esc(opt)}</span><span class="mark ok">${ic('check')}</span><span class="mark no">${ic('close')}</span>`;
