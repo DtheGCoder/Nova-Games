@@ -174,7 +174,7 @@ function renderPlay(room, reveal) {
   $('#q-text').textContent = room.question.q || '';
   const blocked = !me || me.locked || me.spectator || me.eliminated;
 
-  const isMC = (type === 'mc' || type === 'tf' || type === 'emoji' || type === 'video' || type === 'intro');
+  const isMC = (type === 'mc' || type === 'tf' || type === 'emoji' || type === 'video' || type === 'intro' || type === 'audio');
   // toggle input areas
   $('#q-options').style.display = isMC ? 'grid' : 'none';
   $('#q-estimate').classList.toggle('hidden', type !== 'est');
@@ -183,23 +183,28 @@ function renderPlay(room, reveal) {
   const em = $('#q-emoji-media');
   if (type === 'emoji') { em.classList.remove('hidden'); if (em._e !== room.question.emoji) { em._e = room.question.emoji; em.innerHTML = `<div class="emo">${esc(room.question.emoji || '')}</div>`; } }
   else { em.classList.add('hidden'); em._e = null; }
-  // video / intro embed
+  // video / intro / audio embed
   const vm = $('#q-video-media');
-  if ((type === 'video' || type === 'intro') && room.question.yt) {
+  if ((type === 'video' || type === 'intro' || type === 'audio') && room.question.yt) {
     vm.classList.remove('hidden');
     const key = type + ':' + room.question.yt;
     if (vm._v !== key) {
       vm._v = key; const id = encodeURIComponent(room.question.yt);
       let params = 'rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=0';
       if (type === 'intro') params += `&autoplay=1&mute=1&start=0&end=${room.question.ytEnd || 8}`;
-      vm.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?${params}" title="Video" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` +
+      if (type === 'audio' && room.question.ytEnd) params += `&end=${room.question.ytEnd}`;
+      vm.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?${params}" title="Clip" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` +
         `<div class="q-video-cover"></div>` +
         (type === 'intro' ? `<div class="q-intro-badge">🔊 zum Hören antippen</div>` : '') +
+        (type === 'audio' ? `<div class="q-audio-cover"><div class="ac-icon">🎧</div><div class="ac-txt">Tippe zum Abspielen</div><div class="ac-sub">nur Ton — errate es!</div></div>` : '') +
         `<a class="q-video-fallback" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">▶ YouTube</a>`;
     }
+    // reveal the hidden video for audio questions once the round is over
+    const ac = vm.querySelector('.q-audio-cover');
+    if (ac) ac.style.display = reveal ? 'none' : 'flex';
   } else { vm.classList.add('hidden'); vm._v = null; vm.innerHTML = ''; }
-  // 50:50 for mc, emoji, video & intro
-  $('#q-pu-fifty').style.display = ((type === 'mc' || type === 'emoji' || type === 'video' || type === 'intro') && room.settings.powerups) ? '' : 'none';
+  // 50:50 for mc, emoji, video, intro & audio
+  $('#q-pu-fifty').style.display = ((type === 'mc' || type === 'emoji' || type === 'video' || type === 'intro' || type === 'audio') && room.settings.powerups) ? '' : 'none';
   $('#q-pu-double').style.display = room.settings.powerups ? '' : 'none';
   $('#q-powerups').style.display = room.settings.powerups ? 'flex' : 'none';
 

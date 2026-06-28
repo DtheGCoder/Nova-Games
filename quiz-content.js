@@ -566,6 +566,40 @@ const INTRO = [
   { c:'film', d:2, yt:'-RcPZdihrp4', end:9, q:'Welche Serie ist das?', a:['Dark','Stranger Things','The OA','Wednesday'], k:1 },
   { c:'film', d:2, yt:'d1EnW4kn1kg', end:9, q:'Welche Serie ist das?', a:['Naruto','Avatar – Der Herr der Elemente','Dragon Ball','One Piece'], k:1 },
   { c:'film', d:2, yt:'cvDxko2Zm0Q', end:9, q:'Welche Serie ist das?', a:['Adventure Time','Gravity Falls','Steven Universe','Regular Show'], k:0 },
+  { c:'film', d:2, yt:'GcgDuB6ShyY', end:12, q:'Welcher Anime ist das?', a:['Naruto','Dragon Ball','One Piece','Bleach'], k:0 },
+  { c:'film', d:2, yt:'R4vjJrGeh1c', end:12, q:'Welcher Anime ist das?', a:['Naruto','Dragon Ball Z','Pokémon','Digimon'], k:1 },
+  { c:'film', d:2, yt:'IoX2QU822qY', end:10, q:'Welche Serie ist das?', a:['DuckTales','Chip und Chap','TaleSpin','Darkwing Duck'], k:0 },
 ];
 
-module.exports = { TF, EST, LISTS, EMOJI, VIDEO, INTRO };
+/* ===== AUDIO guessing (only sound, video hidden — tap to play) =====
+   yt = YouTube id. Player is covered; you guess by ear. */
+const AUDIO = [
+  /* songs */
+  { c:'musik', d:1, yt:'kJQP7kiw5Fk', q:'Welcher Song ist das? (nur Ton)', a:['Bailando','Despacito','Macarena','Vivir Mi Vida'], k:1 },
+  { c:'musik', d:1, yt:'9bZkp7q19f0', q:'Welcher Song ist das? (nur Ton)', a:['Harlem Shake','Gangnam Style','Gentleman','Macarena'], k:1 },
+  { c:'musik', d:2, yt:'OPf0YbXqDm0', q:'Welcher Song ist das? (nur Ton)', a:['24K Magic','Uptown Funk','Treasure','Finesse'], k:1 },
+  { c:'musik', d:1, yt:'JGwWNGJdvx8', q:'Welcher Song ist das? (nur Ton)', a:['Perfect','Shape of You','Photograph','Galway Girl'], k:1 },
+  { c:'musik', d:2, yt:'fJ9rUzIMcZQ', q:'Welcher Song ist das? (nur Ton)', a:['We Will Rock You','Bohemian Rhapsody','Somebody to Love','Don’t Stop Me Now'], k:1 },
+  { c:'musik', d:2, yt:'Zi_XLOBDo_Y', q:'Welcher Song ist das? (nur Ton)', a:['Beat It','Billie Jean','Thriller','Smooth Criminal'], k:1 },
+  { c:'musik', d:1, yt:'4NRXx6U8ABQ', q:'Welcher Song ist das? (nur Ton)', a:['Save Your Tears','Blinding Lights','Starboy','The Hills'], k:1 },
+  { c:'musik', d:1, yt:'dQw4w9WgXcQ', q:'Welcher Song ist das? (nur Ton)', a:['Take On Me','Never Gonna Give You Up','Africa','Tainted Love'], k:1 },
+  { c:'musik', d:2, yt:'hTWKbfoikeg', q:'Welcher Song ist das? (nur Ton)', a:['Come As You Are','Smells Like Teen Spirit','In Bloom','Lithium'], k:1 },
+  { c:'musik', d:1, yt:'gdZLi9oWNZg', q:'Welcher Song ist das? (nur Ton)', a:['Butter','Dynamite','Boy with Luv','DNA'], k:1 },
+  { c:'musik', d:1, yt:'DyDfgMOUjCI', q:'Welcher Song ist das? (nur Ton)', a:['bad guy','lovely','Therefore I Am','Happier Than Ever'], k:0 },
+  { c:'musik', d:2, yt:'60ItHLz5WEA', q:'Welcher Song ist das? (nur Ton)', a:['Alone','Faded','Sing Me to Sleep','The Spectre'], k:1 },
+  { c:'musik', d:1, yt:'ZbZSe6N_BXs', q:'Welcher Song ist das? (nur Ton)', a:['Happy','Get Lucky','Freedom','Blurred Lines'], k:0 },
+  { c:'musik', d:1, yt:'7wtfhZwyrcc', q:'Welcher Song ist das? (nur Ton)', a:['Believer','Thunder','Radioactive','Demons'], k:0 },
+  { c:'musik', d:1, yt:'nfWlot6h_JM', q:'Welcher Song ist das? (nur Ton)', a:['Blank Space','Shake It Off','Bad Blood','Style'], k:1 },
+  { c:'musik', d:1, yt:'YQHsXMglC9A', q:'Welcher Song ist das? (nur Ton)', a:['Hello','Someone Like You','Rolling in the Deep','Easy on Me'], k:0 },
+  { c:'musik', d:2, yt:'IHNzOHi8sJs', q:'Welcher Song ist das? (nur Ton)', a:['Kill This Love','DDU-DU DDU-DU','How You Like That','Boombayah'], k:1 },
+  { c:'musik', d:3, yt:'1w7OgIMMRc4', q:'Welcher Song ist das? (nur Ton)', a:['November Rain','Sweet Child O’ Mine','Paradise City','Welcome to the Jungle'], k:1 },
+  /* game themes */
+  { c:'gaming', d:1, yt:'nsff88sufkI', q:'Welches Game-Theme ist das?', a:['Super Mario','The Legend of Zelda','Sonic','Pac-Man'], k:0 },
+  { c:'gaming', d:2, yt:'cGufy1PAeTU', q:'Welches Game-Theme ist das?', a:['Final Fantasy','The Legend of Zelda','Skyrim','Metroid'], k:1 },
+  { c:'gaming', d:1, yt:'tehZmdXbMac', q:'Welches Game-Theme ist das?', a:['Pac-Man','Tetris','Pong','Snake'], k:1 },
+  { c:'gaming', d:2, yt:'G-i8HYi1QH0', q:'Welches Game-Theme ist das?', a:['Sonic the Hedgehog','Super Mario','Crash Bandicoot','Rayman'], k:0 },
+  { c:'gaming', d:2, yt:'aBkTkxKDduc', q:'Welches Game-Theme ist das?', a:['Terraria','Minecraft','Roblox','Stardew Valley'], k:1 },
+  { c:'gaming', d:3, yt:'gChDf7lTEQQ', q:'Welches Game-Theme ist das?', a:['The Witcher','Skyrim','Dragon Age','Dark Souls'], k:1 },
+];
+
+module.exports = { TF, EST, LISTS, EMOJI, VIDEO, INTRO, AUDIO };
