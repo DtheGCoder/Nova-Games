@@ -1,0 +1,10 @@
+# dependencies (reinstalled on the server by start.sh / auto-updater)
+node_modules/
+
+# runtime data (accounts, sessions) — never committed, kept across updates
+data/
+
+# logs / os cruft
+*.log
+.DS_Store
+Thumbs.db

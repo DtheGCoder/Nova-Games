@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a1f1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>NOVA · Casino</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>" />
+</head>
+<body>
+  <div class="bg-felt"></div>
+  <div class="bg-glow"></div>
+  <div class="bg-vignette"></div>
+  <canvas id="fxCanvas"></canvas>
+
+  <!-- ============ SCREEN: AUTH ============ -->
+  <section id="screen-auth" class="screen active">
+    <div class="auth-wrap">
+      <div class="logo">
+        <div class="logo-suit" data-icon="spade"></div>
+        <h1>NOVA<span>CASINO</span></h1>
+        <p class="tagline">Spiele · Turniere · Echtes Ranking</p>
+      </div>
+      <div class="auth-card glass">
+        <div class="auth-tabs">
+          <button id="tab-login" class="auth-tab active">Anmelden</button>
+          <button id="tab-register" class="auth-tab">Registrieren</button>
+        </div>
+        <label class="field"><span>Benutzername</span>
+          <input id="auth-user" type="text" maxlength="16" placeholder="username" autocomplete="username" autocapitalize="off" />
+        </label>
+        <label class="field"><span>Passwort</span>
+          <input id="auth-pass" type="password" maxlength="64" placeholder="••••••••" autocomplete="current-password" />
+        </label>
+        <button id="btn-auth" class="btn btn-gold big"><span data-icon="user" class="bi"></span> <span id="auth-btn-label">Anmelden</span></button>
+        <p id="auth-error" class="error-line"></p>
+        <p class="auth-note">Login bleibt 30 Tage gespeichert. Keine E-Mail nötig.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: HUB ============ -->
+  <section id="screen-hub" class="screen">
+    <header class="hub-top glass">
+      <div class="brand"><span class="brand-suit" data-icon="spade"></span><b>NOVA</b></div>
+      <div class="profile-chip" id="profile-chip">
+        <span class="pc-avatar" id="pc-avatar">?</span>
+        <div class="pc-meta">
+          <span class="pc-name" id="pc-name">—</span>
+          <span class="pc-money"><span class="mini-icon" data-icon="coins"></span> <b id="pc-money">0</b></span>
+        </div>
+        <button id="btn-logout" class="icon-btn sm" title="Abmelden"><span data-icon="logout"></span></button>
+      </div>
+    </header>
+
+    <div class="hub-scroll">
+      <div class="hub-hero glass">
+        <div class="hero-text">
+          <h2>Willkommen, <span id="hero-name">Spieler</span> 👋</h2>
+          <p>Wähle ein Spiel, tritt einem Tisch bei oder starte ein Turnier.</p>
+        </div>
+        <div class="hero-actions">
+          <button id="btn-admin" class="btn btn-ghost sm hidden"><span data-icon="admin" class="bi"></span> Admin</button>
+          <button id="btn-bonus" class="btn btn-emerald sm hidden"><span data-icon="gift" class="bi"></span> Gratis-Chips</button>
+        </div>
+      </div>
+
+      <h3 class="section-title"><span data-icon="cards" class="st-ic"></span> Spiele</h3>
+      <div class="games-grid" id="games-grid"></div>
+
+      <h3 class="section-title"><span data-icon="trophy" class="st-ic"></span> Rangliste</h3>
+      <div class="board-list glass" id="hub-board"></div>
+
+      <div class="hub-foot">NOVA Casino · spielerisches Geld, kein Echtgeld</div>
+    </div>
+  </section>
+
+  <!-- ============ MODAL: ENTER BLACKJACK ============ -->
+  <div id="modal-enter" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><h2><span data-icon="cards" class="h-ic"></span> Blackjack</h2><button class="icon-btn" data-close="modal-enter"><span data-icon="close"></span></button></div>
+      <div class="enter-body">
+        <div class="mode-switch">
+          <button class="mode-opt active" data-mode="cash">
+            <span class="mo-ic" data-icon="coins"></span><b>Freies Spiel</b><small>Spaß-Chips, kein Risiko, Rebuy erlaubt</small>
+          </button>
+          <button class="mode-opt" data-mode="tournament">
+            <span class="mo-ic" data-icon="trophy"></span><b>Turnier</b><small>Buy-in aus Guthaben · letzter gewinnt den Pot</small>
+          </button>
+        </div>
+        <div id="tourney-buyin" class="buyin-row hidden">
+          <span>Buy-in</span>
+          <div class="seg" id="buyin-seg"></div>
+        </div>
+        <button id="btn-create" class="btn btn-gold big"><span data-icon="plus" class="bi"></span> Raum erstellen</button>
+        <div class="divider"><span>oder Tisch beitreten</span></div>
+        <div class="join-row">
+          <input id="inp-code" type="text" maxlength="4" placeholder="CODE" class="code-input" autocomplete="off" />
+          <button id="btn-join" class="btn btn-emerald">Beitreten</button>
+        </div>
+        <p id="enter-error" class="error-line"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: GAME ============ -->
+  <section id="screen-game" class="screen">
+    <header class="topbar glass">
+      <button id="btn-leave" class="icon-btn" title="Zurück zum Hub"><span data-icon="back"></span></button>
+      <div class="room-pill" id="room-pill">
+        <span class="rp-label">RAUM</span>
+        <span class="rp-code" id="room-code">----</span>
+        <button id="btn-copy" class="copy-btn" title="Einladen"><span data-icon="copy"></span></button>
+      </div>
+      <div class="topbar-right">
+        <div class="mode-badge" id="mode-badge"></div>
+        <button id="btn-settings" class="icon-btn" title="Einstellungen"><span data-icon="settings"></span></button>
+        <button id="btn-board" class="icon-btn" title="Rangliste"><span data-icon="trophy"></span></button>
+      </div>
+    </header>
+
+    <!-- prize pool / tournament status -->
+    <div id="tourney-bar" class="tourney-bar hidden">
+      <div class="tb-item"><span data-icon="trophy" class="tb-ic"></span> Pot <b id="tb-pool">0</b></div>
+      <div class="tb-item"><span data-icon="user" class="tb-ic"></span> <b id="tb-alive">0</b> übrig</div>
+    </div>
+
+    <div id="phase-banner" class="phase-banner"></div>
+
+    <main class="table-area">
+      <div class="dealer-zone">
+        <div class="dealer-head">
+          <span class="dealer-label">DEALER</span>
+          <span class="dealer-value" id="dealer-value"></span>
+        </div>
+        <div class="hand dealer-hand" id="dealer-hand"></div>
+        <div class="shoe-info"><span class="mini-icon" data-icon="cards"></span> <span id="shoe-left"></span></div>
+      </div>
+
+      <div class="center-status">
+        <div id="timer-ring" class="timer-ring">
+          <svg viewBox="0 0 80 80"><circle class="tr-bg" cx="40" cy="40" r="34"/><circle id="tr-fg" class="tr-fg" cx="40" cy="40" r="34"/></svg>
+          <span id="timer-text"></span>
+        </div>
+      </div>
+
+      <div class="players-row" id="players-row"></div>
+    </main>
+
+    <div class="dock glass" id="dock">
+      <!-- Lobby (tournament) -->
+      <div id="lobby-panel" class="panel hidden">
+        <div class="lobby-head"><span data-icon="trophy" class="lh-ic"></span><b>Turnier-Lobby</b></div>
+        <div class="lobby-info">Pot <b id="lobby-pool">0</b> · <span id="lobby-count">0</span> Spieler bereit</div>
+        <div id="lobby-players" class="lobby-players"></div>
+        <button id="btn-start-match" class="btn btn-gold hidden"><span data-icon="bolt" class="bi"></span> Turnier starten</button>
+        <div id="lobby-wait" class="bet-hint">Warte auf Host…</div>
+      </div>
+
+      <!-- Betting -->
+      <div id="bet-panel" class="panel">
+        <div class="bet-summary">
+          <div class="chip-balance"><span class="mini-icon" data-icon="coins"></span> <b id="my-chips">0</b></div>
+          <div class="bet-current">Einsatz <b id="bet-current">0</b></div>
+        </div>
+        <div class="chip-rack" id="chip-rack"></div>
+        <div class="sidebet-row" id="sidebet-row">
+          <button class="sb-btn" data-sb="perfectPairs"><span>Perfect Pairs</span><b id="sb-pp">0</b></button>
+          <button class="sb-btn" data-sb="twentyOnePlus3"><span>21+3</span><b id="sb-t3">0</b></button>
+        </div>
+        <div class="bet-actions">
+          <button id="btn-clearbet" class="btn btn-ghost">Clear</button>
+          <button id="btn-rebuy" class="btn btn-ghost hidden"><span data-icon="refresh" class="bi"></span> Rebuy</button>
+          <button id="btn-deal" class="btn btn-gold hidden">DEAL</button>
+        </div>
+        <div class="bet-hint" id="bet-hint">Setze deinen Einsatz…</div>
+      </div>
+
+      <!-- Insurance -->
+      <div id="insurance-panel" class="panel hidden">
+        <div class="ins-title"><span data-icon="shield" class="bi"></span> Dealer zeigt ein Ass — Versicherung?</div>
+        <div class="ins-actions">
+          <button id="btn-ins-yes" class="btn btn-gold">Versichern (½)</button>
+          <button id="btn-ins-no" class="btn btn-ghost">Nein</button>
+        </div>
+      </div>
+
+      <!-- Action -->
+      <div id="action-panel" class="panel hidden">
+        <button class="act-btn act-hit" data-act="hit"><b>HIT</b><span>Karte</span></button>
+        <button class="act-btn act-stand" data-act="stand"><b>STAND</b><span>Halten</span></button>
+        <button class="act-btn act-double" data-act="double"><b>DOUBLE</b><span>×2</span></button>
+        <button class="act-btn act-split" data-act="split"><b>SPLIT</b><span>Teilen</span></button>
+        <button class="act-btn act-surr" data-act="surrender"><b>SURR</b><span>Aufgeben</span></button>
+      </div>
+
+      <!-- Waiting / spectator / eliminated -->
+      <div id="wait-panel" class="panel hidden">
+        <div class="wait-text" id="wait-text">Warte…</div>
+        <button id="btn-forfeit" class="btn btn-ghost sm hidden"><span data-icon="logout" class="bi"></span> Aufgeben</button>
+      </div>
+    </div>
+
+    <!-- floating controls -->
+    <button class="fab fab-chat" id="chat-fab"><span data-icon="chat"></span></button>
+    <button class="fab fab-emote" id="emote-fab"><span data-icon="cool" class="emote-ic"></span></button>
+
+    <!-- emote popup -->
+    <div class="emote-popup glass" id="emote-popup"></div>
+  </section>
+
+  <!-- ============ MODAL: SETTINGS ============ -->
+  <div id="modal-settings" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><h2><span data-icon="settings" class="h-ic"></span> Einstellungen</h2><button class="icon-btn" data-close="modal-settings"><span data-icon="close"></span></button></div>
+      <div class="settings-body" id="settings-body"></div>
+      <div class="modal-foot">
+        <p class="host-note" id="host-note"></p>
+        <button id="btn-save-settings" class="btn btn-gold">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: LEADERBOARD ============ -->
+  <div id="modal-board" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><h2><span data-icon="trophy" class="h-ic"></span> Tisch-Rangliste</h2><button class="icon-btn" data-close="modal-board"><span data-icon="close"></span></button></div>
+      <div class="board-body" id="board-body"></div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: ADMIN ============ -->
+  <div id="modal-admin" class="modal">
+    <div class="modal-card glass admin-card">
+      <div class="modal-head"><h2><span data-icon="admin" class="h-ic"></span> Admin-Panel</h2><button class="icon-btn" data-close="modal-admin"><span data-icon="close"></span></button></div>
+      <div class="admin-toolbar">
+        <input id="admin-search" type="text" placeholder="Spieler suchen…" />
+        <button id="admin-refresh" class="icon-btn sm" title="Aktualisieren"><span data-icon="refresh"></span></button>
+      </div>
+      <div class="admin-body" id="admin-body"></div>
+      <div class="admin-foot"><span id="admin-count">0 Spieler</span></div>
+    </div>
+  </div>
+
+  <!-- ============ MATCH OVER OVERLAY ============ -->
+  <div id="match-over" class="overlay-win">
+    <div class="win-card glass">
+      <div class="win-trophy" data-icon="trophy"></div>
+      <div class="win-title">TURNIER BEENDET</div>
+      <div class="win-name" id="win-name">—</div>
+      <div class="win-pot"><span class="mini-icon" data-icon="coins"></span> <b id="win-pot">0</b> gewonnen</div>
+      <button id="btn-win-close" class="btn btn-gold">Weiter</button>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toast-wrap"></div>
+
+  <!-- Chat -->
+  <div class="chat-panel glass" id="chat-panel">
+    <div class="chat-head"><span><span data-icon="chat" class="h-ic"></span> Chat</span><button class="icon-btn" id="chat-close"><span data-icon="close"></span></button></div>
+    <div class="chat-log" id="chat-log"></div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" maxlength="140" placeholder="Nachricht…" />
+      <button id="chat-send" class="btn btn-emerald"><span data-icon="plus" style="transform:rotate(45deg)"></span></button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="icons.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+</body>
+</html>
