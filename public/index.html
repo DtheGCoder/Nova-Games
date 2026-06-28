@@ -9,8 +9,8 @@
   <title>NOVA · Casino</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=6" />
-  <link rel="stylesheet" href="quiz.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="quiz.css?v=7" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>" />
 </head>
 <body>
@@ -330,6 +330,11 @@
           <div class="win-name" id="q-win-name">—</div>
           <div class="win-pot" id="q-win-pot"></div>
           <div class="q-ranking" id="q-ranking"></div>
+          <div class="q-gameover-actions">
+            <button id="q-rematch" class="btn btn-gold big hidden"><span data-icon="refresh" class="bi"></span> Nochmal spielen</button>
+            <p id="q-rematch-wait" class="bet-hint hidden">Warte auf Host für die nächste Runde…</p>
+            <button id="q-tohub" class="btn btn-ghost sm"><span data-icon="home" class="bi"></span> Zum Hub</button>
+          </div>
         </div>
       </div>
     </main>
@@ -416,8 +421,8 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="icons.js?v=6"></script>
-  <script src="app.js?v=6"></script>
-  <script src="quiz-client.js?v=6"></script>
+  <script src="icons.js?v=7"></script>
+  <script src="app.js?v=7"></script>
+  <script src="quiz-client.js?v=7"></script>
 </body>
 </html>

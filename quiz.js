@@ -195,9 +195,9 @@ module.exports = function createQuiz(deps) {
       p.estimate = null; p.found = []; p.guessed = [];
       if (!p.eliminated && !p.spectator) p.wager = clamp(Math.min(room.settings.minBet, p.chips), 1, p.chips); else p.wager = 0;
     }
+    setTimer(room, room.settings.wagerTime, () => startQuestion(room)); // set timerEndsAt BEFORE broadcasting
     broadcast(room);
     fx(room, { type: 'wagerOpen', round: room.round });
-    setTimer(room, room.settings.wagerTime, () => startQuestion(room));
   }
 
   function startQuestion(room) {
@@ -205,9 +205,9 @@ module.exports = function createQuiz(deps) {
     room.phase = 'question'; room.qStartAt = Date.now();
     // ensure everyone has a valid wager
     for (const p of eligible(room)) p.wager = clamp(p.wager || Math.min(room.settings.minBet, p.chips), 1, p.chips);
+    setTimer(room, room.settings.questionTime, () => revealAnswer(room)); // set timerEndsAt BEFORE broadcasting
     broadcast(room);
     fx(room, { type: 'questionStart' });
-    setTimer(room, room.settings.questionTime, () => revealAnswer(room));
   }
 
   function maybeEarlyReveal(room) {
@@ -250,9 +250,9 @@ module.exports = function createQuiz(deps) {
       else { const loss = Math.round(p.wager * dm); p.chips = Math.max(0, p.chips - loss); p.roundDelta = -loss; p.streak = 0; }
     }
     persist();
+    setTimer(room, 5, () => afterReveal(room)); // set timerEndsAt BEFORE broadcasting
     broadcast(room);
     fx(room, { type: 'reveal' });
-    setTimer(room, 5, () => afterReveal(room));
   }
 
   function afterReveal(room) {
@@ -278,11 +278,16 @@ module.exports = function createQuiz(deps) {
     } else if (top) { winnerName = top.name; }
     persist();
     room.winner = { name: winnerName, pool: room.prizePool, ranking: ranking.map(p => ({ name: p.name, chips: p.chips, correct: p.correctCount, best: p.bestStreak })) };
+    // prepare for an instant rematch — players stay in the room
+    room.prizePool = 0; room.round = 0; room.currentQ = null;
+    for (const p of room.players.values()) { p.eliminated = false; p.spectator = false; p.anted = false; p.streak = 0; p.correctCount = 0; }
     broadcast(room);
-    fx(room, { type: 'gameOver', winner: winnerName, pool: room.prizePool });
-    setTimer(room, 12, () => {
-      room.prizePool = 0; room.phase = 'lobby'; room.winner = null; room.round = 0; room.currentQ = null;
-      for (const p of room.players.values()) { p.eliminated = false; p.spectator = false; p.anted = false; p.streak = 0; p.correctCount = 0; p.chips = room.settings.mode === 'cash' ? room.settings.startingChips : 0; }
+    fx(room, { type: 'gameOver', winner: winnerName, pool: room.winner.pool });
+    // safety net: drop back to lobby if nobody starts a rematch
+    setTimer(room, 45, () => {
+      if (room.phase !== 'gameover') return;
+      room.phase = 'lobby'; room.winner = null;
+      for (const p of room.players.values()) p.chips = room.settings.mode === 'cash' ? room.settings.startingChips : 0;
       broadcast(room);
     });
   }

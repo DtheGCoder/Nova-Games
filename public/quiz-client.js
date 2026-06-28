@@ -28,7 +28,11 @@ const Q = {
 /* ============================ SOCKET BIND ============================ */
 function bindSocket(s) {
   socket = s;
-  s.on('quiz:state', (room) => { try { Q.room = room; Q.code = room.code; render(); } catch (e) { console.error('QUIZ render error:', e && e.message, e && e.stack); } });
+  s.on('quiz:state', (room) => {
+    Q.room = room; Q.code = room.code; Q._drift = room.serverNow - Date.now();
+    ensureTimerLoop();                       // timer runs independently of render()
+    try { render(); } catch (e) { console.error('QUIZ render error:', e && e.message, e && e.stack); }
+  });
   s.on('quiz:fx', onFx);
 }
 
@@ -289,6 +293,7 @@ $('#q-pu-double').addEventListener('click', () => { socket.emit('quiz:powerup', 
 
 function renderGameover(room) {
   const w = room.winner || {};
+  const me = myP();
   $('#q-win-name').textContent = w.name || 'Niemand';
   $('#q-win-pot').innerHTML = room.mode === 'tournament' && w.pool ? `<span class="mini-icon">${ic('coins')}</span> ${fmt(w.pool)} gewonnen` : 'Gut gespielt!';
   const rk = $('#q-ranking'); rk.innerHTML = '';
@@ -298,6 +303,10 @@ function renderGameover(room) {
     row.innerHTML = `<div class="r">${medal}</div><div class="n">${esc(p.name)}<small>${p.correct} richtig · beste Serie ${p.best}</small></div><div class="c"><span class="mini-icon">${ic('coins')}</span>${fmt(p.chips)}</div>`;
     rk.appendChild(row);
   });
+  const isHost = me && me.isHost;
+  $('#q-rematch').classList.toggle('hidden', !isHost);
+  $('#q-rematch').disabled = false;
+  $('#q-rematch-wait').classList.toggle('hidden', !!isHost);
 }
 
 function renderPlayers(room) {
@@ -324,22 +333,25 @@ function renderPlayers(room) {
   });
 }
 
-/* ============================ TIMER ============================ */
-function renderTimer(room) {
-  const total = room.phase === 'wager' ? room.settings.wagerTime : room.phase === 'question' ? room.settings.questionTime : room.phase === 'reveal' ? 5 : 0;
-  const fill = $('#q-timerfill'), num = $('#q-timer-num');
-  if (!total || !room.timerEndsAt) { num.textContent = ''; if (Q.timerRAF) { cancelAnimationFrame(Q.timerRAF); Q.timerRAF = null; } return; }
-  const drift = room.serverNow - Date.now();
-  const tick = () => {
-    const remain = Math.max(0, room.timerEndsAt - (Date.now() + drift));
-    const frac = Math.min(1, remain / (total * 1000));
-    fill.style.width = (frac * 100) + '%';
-    fill.className = 'q-timerfill' + (frac < .25 ? ' danger' : frac < .5 ? ' warn' : '');
-    num.textContent = room.phase === 'reveal' ? '' : Math.ceil(remain / 1000);
-    if (remain > 0) Q.timerRAF = requestAnimationFrame(tick);
-  };
-  if (Q.timerRAF) cancelAnimationFrame(Q.timerRAF); tick();
+/* ============================ TIMER (independent loop) ============================ */
+function ensureTimerLoop() {
+  if (Q._timerLoop) return;
+  const loop = () => { Q._timerLoop = requestAnimationFrame(loop); try { updateTimerUI(); } catch (e) {} };
+  Q._timerLoop = requestAnimationFrame(loop);
 }
+function updateTimerUI() {
+  const room = Q.room; const fill = $('#q-timerfill'), num = $('#q-timer-num');
+  if (!fill || !num) return;
+  if (!room || !$('#screen-quiz').classList.contains('active')) { num.textContent = ''; return; }
+  const total = room.phase === 'wager' ? room.settings.wagerTime : room.phase === 'question' ? room.settings.questionTime : room.phase === 'reveal' ? 5 : 0;
+  if (!total || !room.timerEndsAt) { num.textContent = ''; fill.style.width = '100%'; fill.className = 'q-timerfill'; return; }
+  const remain = Math.max(0, room.timerEndsAt - (Date.now() + (Q._drift || 0)));
+  const frac = Math.min(1, remain / (total * 1000));
+  fill.style.width = (frac * 100) + '%';
+  fill.className = 'q-timerfill' + (frac < .25 ? ' danger' : frac < .5 ? ' warn' : '');
+  num.textContent = room.phase === 'reveal' ? '' : Math.ceil(remain / 1000);
+}
+function renderTimer() { updateTimerUI(); }
 
 /* ============================ FX ============================ */
 function onFx(e) {
@@ -380,6 +392,8 @@ function onEmote(playerId, name) { const el = $(`.qp[data-pid="${playerId}"]`); 
 
 /* ============================ CONTROLS ============================ */
 $('#q-start').addEventListener('click', () => { socket.emit('quiz:start'); Sound.button(); });
+$('#q-rematch').addEventListener('click', () => { socket.emit('quiz:start'); Sound.button(); $('#q-rematch').disabled = true; });
+$('#q-tohub').addEventListener('click', () => { socket.emit('quiz:leave'); Q.room = null; Q.me = null; N.showScreen('screen-hub'); setTimeout(() => { N.refreshMe(); N.loadHub(); }, 400); Sound.button(); });
 $('#q-leave').addEventListener('click', () => { if (confirm('Quiz verlassen?')) { socket.emit('quiz:leave'); Q.room = null; Q.me = null; N.showScreen('screen-hub'); setTimeout(() => { N.refreshMe(); N.loadHub(); }, 400); } });
 $('#q-copy').addEventListener('click', () => { const code = Q.room && Q.room.code; if (!code) return; const url = location.origin + '/#Q' + code; if (navigator.clipboard) navigator.clipboard.writeText(url); toast('Link kopiert!', 'good', false, 'copy'); Sound.button(); });
 $('#q-board-btn').addEventListener('click', () => { openBoard(); Sound.button(); });

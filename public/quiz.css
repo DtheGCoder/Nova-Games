@@ -166,3 +166,8 @@
 
 /* settings seg wrap */
 .seg.wrap{flex-wrap:wrap;justify-content:flex-end;max-width:62%}
+
+/* gameover actions */
+.q-gameover-actions{display:flex;flex-direction:column;gap:10px;width:100%;margin-top:14px}
+.q-gameover-actions .btn{width:100%}
+.q-gameover-actions .bet-hint{margin:0}
