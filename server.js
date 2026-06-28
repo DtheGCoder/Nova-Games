@@ -12,6 +12,7 @@ const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
+const createQuiz = require('./quiz');
 
 const PORT = process.env.PORT || 3524;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -203,9 +204,9 @@ app.get('/api/games', (req, res) => {
   for (const r of rooms.values()) { bjRooms++; bjPlayers += r.players.size; }
   res.json({ games: [
     { id: 'blackjack', name: 'Blackjack', tagline: 'Multiplayer · Side Bets · Turniere', status: 'live', online: bjPlayers, rooms: bjRooms },
+    { id: 'quiz', name: 'NOVA Quiz', tagline: 'Wissen · Wetten · Tempo', status: 'live', online: quizGame.online(), rooms: quizGame.roomCount() },
     { id: 'poker', name: 'Texas Hold’em', tagline: 'Bald verfügbar', status: 'soon', online: 0 },
     { id: 'roulette', name: 'Roulette', tagline: 'Bald verfügbar', status: 'soon', online: 0 },
-    { id: 'slots', name: 'Mega Slots', tagline: 'Bald verfügbar', status: 'soon', online: 0 },
   ] });
 });
 
@@ -226,6 +227,13 @@ function sockAccount(socket) { return accounts[(socket.data.username || '').toLo
 function socketsOf(username) { const out = []; const u = (username || '').toLowerCase(); for (const [, s] of io.of('/').sockets) if (s.data.username && s.data.username.toLowerCase() === u) out.push(s); return out; }
 function isOnline(username) { return socketsOf(username).length > 0; }
 function pushAccountUpdate(acc) { for (const s of socketsOf(acc.username)) s.emit('account', publicAccount(acc)); }
+
+/* ----------------------------- QUIZ GAME ----------------------------- */
+const quizGame = createQuiz({
+  io,
+  getAccount: u => accounts[(u || '').toLowerCase()] || null,
+  persist, publicAccount, pushAccountUpdate,
+});
 
 /* ============================== CARDS ================================= */
 const SUITS = ['S', 'H', 'D', 'C'];
@@ -615,6 +623,7 @@ function anteUp(room, player) {
 /* =============================== SOCKETS ============================== */
 io.on('connection', (socket) => {
   socket.emit('account', publicAccount(sockAccount(socket)));
+  quizGame.attach(socket);
 
   socket.on('createRoom', (data, cb) => {
     try {

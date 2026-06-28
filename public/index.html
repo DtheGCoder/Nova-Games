@@ -9,7 +9,8 @@
   <title>NOVA · Casino</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="quiz.css?v=5" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>" />
 </head>
 <body>
@@ -214,6 +215,123 @@
     <div class="emote-popup glass" id="emote-popup"></div>
   </section>
 
+  <!-- ============ MODAL: ENTER QUIZ ============ -->
+  <div id="modal-quiz-enter" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><h2><span data-icon="bolt" class="h-ic"></span> NOVA Quiz</h2><button class="icon-btn" data-close="modal-quiz-enter"><span data-icon="close"></span></button></div>
+      <div class="enter-body">
+        <div class="mode-switch">
+          <button class="mode-opt active" data-qmode="cash"><span class="mo-ic" data-icon="coins"></span><b>Freies Spiel</b><small>Üben mit Spaß-Chips</small></button>
+          <button class="mode-opt" data-qmode="tournament"><span class="mo-ic" data-icon="trophy"></span><b>Turnier</b><small>Buy-in · bester gewinnt den Pot</small></button>
+        </div>
+        <div id="q-buyin-row" class="buyin-row hidden"><span>Buy-in</span><div class="seg" id="q-buyin-seg"></div></div>
+        <div class="q-setrow"><span>Kategorie</span><select id="q-cat-sel" class="q-select"></select></div>
+        <div class="q-setrow"><span>Schwierigkeit</span>
+          <div class="seg" id="q-diff-seg">
+            <button data-d="mixed" class="on">Gemischt</button><button data-d="easy">Leicht</button><button data-d="medium">Mittel</button><button data-d="hard">Schwer</button>
+          </div>
+        </div>
+        <div class="q-setrow"><span>Fragen</span>
+          <div class="seg" id="q-rounds-seg">
+            <button data-r="5">5</button><button data-r="10" class="on">10</button><button data-r="15">15</button><button data-r="20">20</button>
+          </div>
+        </div>
+        <button id="q-create" class="btn btn-gold big"><span data-icon="plus" class="bi"></span> Quiz-Raum erstellen</button>
+        <div class="divider"><span>oder beitreten</span></div>
+        <div class="join-row"><input id="q-join-code" type="text" maxlength="4" placeholder="CODE" class="code-input" /><button id="q-join" class="btn btn-emerald">Beitreten</button></div>
+        <p id="q-enter-error" class="error-line"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: QUIZ ============ -->
+  <section id="screen-quiz" class="screen">
+    <header class="topbar glass">
+      <button id="q-leave" class="icon-btn" title="Zurück zum Hub"><span data-icon="back"></span></button>
+      <div class="room-pill"><span class="rp-label">RAUM</span><span class="rp-code" id="q-code">----</span><button id="q-copy" class="copy-btn"><span data-icon="copy"></span></button></div>
+      <div class="topbar-right"><div class="mode-badge" id="q-mode-badge"></div><button id="q-board-btn" class="icon-btn"><span data-icon="trophy"></span></button></div>
+    </header>
+
+    <div class="q-progress" id="q-progress">
+      <div class="q-round-pill">Frage <b id="q-round">0</b><span>/<span id="q-total">0</span></span></div>
+      <div class="q-cat-chip" id="q-cat-chip"></div>
+      <div class="q-timer-num" id="q-timer-num"></div>
+    </div>
+    <div class="q-timerbar" id="q-timerbar"><div class="q-timerfill" id="q-timerfill"></div></div>
+
+    <main class="q-main">
+      <!-- LOBBY -->
+      <div id="q-lobby" class="q-panel">
+        <div class="q-card glass">
+          <div class="q-card-ic" data-icon="bolt"></div>
+          <h2>Quiz-Lobby</h2>
+          <div class="q-pot" id="q-lobby-pot"></div>
+          <div class="lobby-players" id="q-lobby-players"></div>
+          <button id="q-start" class="btn btn-gold big hidden"><span data-icon="bolt" class="bi"></span> Quiz starten</button>
+          <button id="q-settings-open" class="btn btn-ghost sm hidden"><span data-icon="settings" class="bi"></span> Einstellungen</button>
+          <p id="q-lobby-wait" class="bet-hint"></p>
+        </div>
+      </div>
+
+      <!-- WAGER -->
+      <div id="q-wager" class="q-panel hidden">
+        <div class="q-reveal-cat glass" id="q-wager-cat"></div>
+        <div class="q-wager-title">Wie sicher bist du? <span>Setze deine Chips</span></div>
+        <div class="q-wager-amount"><span class="mini-icon" data-icon="coins"></span><b id="q-wager-val">0</b></div>
+        <input type="range" id="q-wager-slider" class="q-slider" min="0" max="100" value="0" />
+        <div class="q-wager-quick" id="q-wager-quick"></div>
+        <div class="q-wager-bal">Guthaben: <b id="q-wager-bal">0</b></div>
+        <button id="q-pu-double-w" class="q-pu-btn"><span data-icon="bolt" class="bi"></span> 2× Doppeln <em id="q-pu-double-w-n"></em></button>
+      </div>
+
+      <!-- PLAY (question + reveal) -->
+      <div id="q-play" class="q-panel hidden">
+        <div class="q-question-text" id="q-text"></div>
+        <div class="q-options" id="q-options"></div>
+        <div class="q-result" id="q-result"></div>
+        <div class="q-powerups" id="q-powerups">
+          <button id="q-pu-fifty" class="q-pu-btn"><span data-icon="info" class="bi"></span> 50:50 <em id="q-pu-fifty-n"></em></button>
+          <button id="q-pu-double" class="q-pu-btn"><span data-icon="bolt" class="bi"></span> 2× <em id="q-pu-double-n"></em></button>
+          <div class="q-mywager">Einsatz <b id="q-play-wager">0</b></div>
+        </div>
+      </div>
+
+      <!-- GAMEOVER -->
+      <div id="q-gameover" class="q-panel hidden">
+        <div class="q-card glass">
+          <div class="win-trophy" data-icon="trophy"></div>
+          <div class="win-title">QUIZ BEENDET</div>
+          <div class="win-name" id="q-win-name">—</div>
+          <div class="win-pot" id="q-win-pot"></div>
+          <div class="q-ranking" id="q-ranking"></div>
+        </div>
+      </div>
+    </main>
+
+    <div class="q-players-strip" id="q-players"></div>
+
+    <button class="fab fab-chat" id="q-chat-fab"><span data-icon="chat"></span></button>
+    <button class="fab fab-emote" id="q-emote-fab"><span data-icon="cool" class="emote-ic"></span></button>
+    <div class="emote-popup glass" id="q-emote-popup"></div>
+  </section>
+
+  <!-- ============ MODAL: QUIZ TABLE BOARD ============ -->
+  <div id="modal-qboard" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><h2><span data-icon="trophy" class="h-ic"></span> Rangliste</h2><button class="icon-btn" data-close="modal-qboard"><span data-icon="close"></span></button></div>
+      <div class="board-body" id="qboard-body"></div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: QUIZ SETTINGS ============ -->
+  <div id="modal-qsettings" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><h2><span data-icon="settings" class="h-ic"></span> Quiz-Einstellungen</h2><button class="icon-btn" data-close="modal-qsettings"><span data-icon="close"></span></button></div>
+      <div class="settings-body" id="qsettings-body"></div>
+      <div class="modal-foot"><p class="host-note">Nur der Host kann ändern</p><button id="q-save-settings" class="btn btn-gold">Speichern</button></div>
+    </div>
+  </div>
+
   <!-- ============ MODAL: SETTINGS ============ -->
   <div id="modal-settings" class="modal">
     <div class="modal-card glass">
@@ -272,7 +390,8 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="icons.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="icons.js?v=5"></script>
+  <script src="app.js?v=5"></script>
+  <script src="quiz-client.js?v=5"></script>
 </body>
 </html>

@@ -141,6 +141,7 @@ function renderGames(games) {
         ? `<div class="gc-foot"><span class="gc-dot"></span>${game.online} online</div>`
         : `<div class="gc-foot" style="color:var(--muted)">Coming soon</div>`);
     if (game.status === 'live' && game.id === 'blackjack') card.addEventListener('click', () => openEnter());
+    if (game.status === 'live' && game.id === 'quiz') card.addEventListener('click', () => window.NOVAQuiz && window.NOVAQuiz.openEnter());
     grid.appendChild(card);
   }
 }
@@ -267,6 +268,7 @@ function connectSocket() {
   socket.on('fx', onFx);
   socket.on('chat', onChat);
   socket.on('disconnect', () => toast('Verbindung verloren…', 'bad'));
+  if (window.NOVAQuiz) window.NOVAQuiz.bindSocket(socket);
 }
 
 /* ============================ HELPERS ============================ */
@@ -610,6 +612,14 @@ $$('[data-close]').forEach(b => b.addEventListener('click', () => $('#' + b.data
 $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
 
 /* ============================ INIT ============================ */
+/* ---- shared API for other game modules (e.g. quiz-client.js) ---- */
+window.NOVA = {
+  get socket() { return state.socket; },
+  get account() { return store.account; },
+  Sound, FX, toast, ICON, fmt, esc, vibrate,
+  showScreen, authHeader, loadHub, renderProfile, refreshMe,
+};
+
 ICON.hydrate(document);
 buildChipRack();
 buildEmotePopup();

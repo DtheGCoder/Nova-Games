@@ -41,8 +41,12 @@ Variablen `DOMAIN`, `HTTPS_PORT`, `APP_PORT` anpassen.
 
 - **Accounts:** Registrierung mit Username + Passwort (kein E-Mail nötig),
   Login bleibt **30 Tage** gespeichert. Passwörter werden gehasht (scrypt).
-- **Hub-Startseite:** alle Spiele gelistet (Blackjack live, weitere „bald"),
+- **Hub-Startseite:** alle Spiele gelistet (Blackjack & NOVA Quiz live, weitere „bald"),
   globale Geld-Rangliste, Profil mit Guthaben. Leicht um neue Spiele erweiterbar.
+- **NOVA Quiz:** Multiplayer-Wissensquiz mit Einsätzen. ~150 Fragen in 14 Kategorien
+  (inkl. „Aktuelles"). Confidence-Wager pro Frage, Tempo-Bonus (schneller = mehr),
+  Streak-Multiplikator, Power-ups (50:50 & 2× Doppeln), Cash- oder Turnier-Modus
+  mit Elimination. Gehostet in `questions.js` (einfach erweiterbar) + `quiz.js`.
 - **Zwei Modi pro Tisch:**
   - **Freies Spiel** — Spaß-Chips, kein Risiko, Rebuy erlaubt.
   - **Turnier (Elimination)** — Buy-in aus dem Guthaben in den Pot; wer auf
