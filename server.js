@@ -338,7 +338,7 @@ function newPlayer(socket) {
     id: socket.id, socketId: socket.id, account: acc.username,
     name: acc.username, seat: -1, connected: true,
     chips: 0, bet: 0, sideBets: { perfectPairs: 0, twentyOnePlus3: 0 },
-    insuranceBet: 0, insuranceResolved: false, hands: [], activeHand: 0, hasBet: false,
+    insuranceBet: 0, insuranceResolved: false, insuranceAnswered: false, hands: [], activeHand: 0, hasBet: false,
     eliminated: false, spectator: false, anted: false,
     stats: { wins: 0, losses: 0, pushes: 0, blackjacks: 0, streak: 0, bestStreak: 0, netRound: 0 },
     lastDelta: 0, emote: null, emoteAt: 0,
@@ -355,7 +355,7 @@ function publicState(room) {
       hands: p.hands.map(h => ({ cards: h.cards, bet: h.bet, done: h.done, result: h.result,
         isSplit: h.isSplit, doubled: h.doubled, surrendered: h.surrendered, blackjack: h.blackjack,
         value: handValue(h.cards) })),
-      activeHand: p.activeHand, hasBet: p.hasBet, stats: p.stats, lastDelta: p.lastDelta,
+      activeHand: p.activeHand, hasBet: p.hasBet, insuranceAnswered: p.insuranceAnswered, stats: p.stats, lastDelta: p.lastDelta,
       eliminated: p.eliminated, spectator: p.spectator, anted: p.anted,
       emote: (p.emote && Date.now() - p.emoteAt < 3500) ? p.emote : null,
       isHost: room.hostId === p.id,
@@ -398,7 +398,7 @@ function startBetting(room) {
   ensureShoe(room);
   for (const p of room.players.values()) {
     p.bet = 0; p.sideBets = { perfectPairs: 0, twentyOnePlus3: 0 };
-    p.insuranceBet = 0; p.insuranceResolved = false; p.hands = []; p.activeHand = 0;
+    p.insuranceBet = 0; p.insuranceResolved = false; p.insuranceAnswered = false; p.hands = []; p.activeHand = 0;
     p.hasBet = false; p.lastDelta = 0;
   }
   broadcast(room); fx(room, { type: 'bettingOpen' });
@@ -715,11 +715,16 @@ io.on('connection', (socket) => {
 
   socket.on('insurance', (data) => {
     const room = getRoomBySocket(socket); const p = getPlayer(room, socket);
-    if (!room || !p || room.phase !== 'insurance' || p.insuranceResolved || p.hands.length === 0) return;
+    if (!room || !p || room.phase !== 'insurance' || p.insuranceResolved || p.insuranceAnswered || p.hands.length === 0) return;
+    p.insuranceAnswered = true;
     if (data && data.take) {
       const cost = Math.floor(p.hands[0].bet / 2);
-      if (cost > 0 && p.chips >= cost) { p.chips -= cost; p.insuranceBet = cost; fxTo(socket.id, { type: 'insuranceTaken', amount: cost }); broadcast(room); }
+      if (cost > 0 && p.chips >= cost) { p.chips -= cost; p.insuranceBet = cost; fxTo(socket.id, { type: 'insuranceTaken', amount: cost }); }
     }
+    broadcast(room);
+    // advance immediately once every player with a bet has answered (timer is the fallback)
+    const bettors = eligiblePlayers(room).filter(x => x.hands.length > 0);
+    if (bettors.every(x => x.insuranceAnswered)) { clearTimer(room); proceedAfterInsurance(room, bettors); }
   });
 
   socket.on('action', (data) => {

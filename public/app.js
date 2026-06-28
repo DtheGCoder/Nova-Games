@@ -379,7 +379,7 @@ function renderDock(room) {
   if (me.eliminated) { showPanel('wait-panel'); $('#wait-text').textContent = '💀 Ausgeschieden — viel Glück den anderen!'; return; }
 
   if (room.phase === 'betting') showPanel('bet-panel');
-  else if (room.phase === 'insurance') { if (me.hands.length && me.bet > 0) showPanel('insurance-panel'); else { showPanel('wait-panel'); $('#wait-text').textContent = 'Versicherungsrunde…'; } }
+  else if (room.phase === 'insurance') { if (me.hands.length && me.bet > 0 && !me.insuranceAnswered) showPanel('insurance-panel'); else { showPanel('wait-panel'); $('#wait-text').textContent = 'Warte auf andere Spieler…'; } }
   else if (room.phase === 'playerTurns' && room.activePlayerId === state.me) { showPanel('action-panel'); updateActionButtons(room, me); maybeForfeit(room, me); }
   else if (['dealing', 'playerTurns', 'dealerTurn'].includes(room.phase)) { showPanel('wait-panel'); $('#wait-text').textContent = room.phase === 'dealerTurn' ? 'Dealer spielt…' : (room.activePlayerId ? `Warte auf ${activeName(room)}…` : 'Karten…'); maybeForfeit(room, me); }
   else if (room.phase === 'payout') { showPanel('wait-panel'); $('#wait-text').textContent = 'Runde abgerechnet…'; }
