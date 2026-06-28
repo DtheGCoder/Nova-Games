@@ -154,9 +154,8 @@ else NGINX_CONF="/etc/nginx/conf.d/${APP_NAME}.conf"; NGINX_LINK=""; fi
 cat > "${NGINX_CONF}" <<EOF
 # Managed by NOVA installer — isolated file, does not touch other sites.
 server {
-    listen ${HTTPS_PORT} ssl;
-    listen [::]:${HTTPS_PORT} ssl;
-    http2 on;
+    listen ${HTTPS_PORT} ssl http2;
+    listen [::]:${HTTPS_PORT} ssl http2;
     server_name ${DOMAIN};
 
     ssl_certificate     ${CERT_FULLCHAIN};
