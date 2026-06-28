@@ -336,4 +336,20 @@ const EMOJI = [
   { c:'kunst', d:3, emoji:'👩🖼️🇫🇷', q:'Welches Gemälde?', a:['Die Sternennacht','Mona Lisa','Der Schrei','Guernica'], k:1 },
 ];
 
-module.exports = { TF, EST, LISTS, EMOJI };
+/* ===== VIDEO questions (embedded YouTube) — answered like multiple choice =====
+   yt = YouTube video id. Watch the clip, then pick the answer.
+   NOTE: replace/extend ids freely; very famous official videos used for stability. */
+const VIDEO = [
+  { c:'musik', d:1, yt:'dQw4w9WgXcQ', q:'Welcher Song läuft hier (Internet-Klassiker)?', a:['Take On Me','Never Gonna Give You Up','Sweet Dreams','Africa'], k:1 },
+  { c:'musik', d:1, yt:'9bZkp7q19f0', q:'Welcher virale Hit ist das?', a:['Despacito','Gangnam Style','Harlem Shake','Macarena'], k:1 },
+  { c:'musik', d:1, yt:'kJQP7kiw5Fk', q:'Wie heißt dieser Mega-Hit?', a:['Bailando','Despacito','Macarena','Waka Waka'], k:1 },
+  { c:'musik', d:2, yt:'fJ9rUzIMcZQ', q:'Welcher Klassiker von Queen ist das?', a:['We Will Rock You','Bohemian Rhapsody','Don’t Stop Me Now','Somebody to Love'], k:1 },
+  { c:'musik', d:2, yt:'djV11Xbc914', q:'Welcher 80er-Hit von a-ha ist das?', a:['Take On Me','Sweet Dreams','Tainted Love','Africa'], k:0 },
+  { c:'musik', d:2, yt:'JGwWNGJdvx8', q:'Welcher Ed-Sheeran-Song ist das?', a:['Perfect','Shape of You','Photograph','Castle on the Hill'], k:1 },
+  { c:'musik', d:2, yt:'OPf0YbXqDm0', q:'Wie heißt dieser Funk-Hit?', a:['24K Magic','Uptown Funk','Treasure','Locked Out of Heaven'], k:1 },
+  { c:'musik', d:1, yt:'RgKAFK5djSk', q:'Welcher Song ist das (Fast & Furious)?', a:['See You Again','Happier','Sugar','Counting Stars'], k:0 },
+  { c:'musik', d:3, yt:'L_jWHffIx5E', q:'Welcher Song (Shrek-Klassiker) ist das?', a:['All Star','Mr. Brightside','I’m a Believer','Accidentally in Love'], k:0 },
+  { c:'musik', d:2, yt:'CevxZvSJLk8', q:'Welcher Katy-Perry-Song ist das?', a:['Firework','Roar','Dark Horse','California Gurls'], k:1 },
+];
+
+module.exports = { TF, EST, LISTS, EMOJI, VIDEO };

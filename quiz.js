@@ -5,7 +5,7 @@
    ========================================================================= */
 'use strict';
 const { CATEGORIES, QUESTIONS } = require('./questions');
-const { TF, EST, LISTS, EMOJI } = require('./quiz-content');
+const { TF, EST, LISTS, EMOJI, VIDEO } = require('./quiz-content');
 const CAT_BY_ID = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 const DIFF_LABEL = { 1: 'Leicht', 2: 'Mittel', 3: 'Schwer' };
 
@@ -16,8 +16,9 @@ const POOL = [
   ...EST.map(q => ({ ...q, type: 'est' })),
   ...LISTS.map(q => ({ ...q, type: 'list', q: q.topic })),
   ...(EMOJI || []).map(q => ({ ...q, type: 'emoji' })),
+  ...(VIDEO || []).map(q => ({ ...q, type: 'video' })),
 ];
-const TYPE_LABEL = { mc: 'Multiple Choice', tf: 'Wahr oder Falsch', est: 'Schätzfrage', list: 'Top-Liste', emoji: 'Emoji-Rätsel' };
+const TYPE_LABEL = { mc: 'Multiple Choice', tf: 'Wahr oder Falsch', est: 'Schätzfrage', list: 'Top-Liste', emoji: 'Emoji-Rätsel', video: 'Video-Quiz' };
 
 function normalize(s) {
   return (s || '').toString().toLowerCase().trim().replace(/[.!?,;:"'`]/g, '').replace(/\s+/g, ' ').replace(/ß/g, 'ss').replace(/[-_/]/g, ' ').trim();
@@ -77,7 +78,7 @@ function sanitize(s) {
   o.startingChips = clamp(int(o.startingChips, 1000), 100, 1000000);
   o.category = (o.category === 'mixed' || CAT_BY_ID[o.category]) ? o.category : 'mixed';
   o.difficulty = ['mixed', 'easy', 'medium', 'hard'].includes(o.difficulty) ? o.difficulty : 'mixed';
-  o.qtype = ['mixed', 'mc', 'tf', 'est', 'list', 'emoji'].includes(o.qtype) ? o.qtype : 'mixed';
+  o.qtype = ['mixed', 'mc', 'tf', 'est', 'list', 'emoji', 'video'].includes(o.qtype) ? o.qtype : 'mixed';
   o.totalRounds = clamp(int(o.totalRounds, 10), 3, 30);
   o.questionTime = clamp(int(o.questionTime, 18), 8, 40);
   o.wagerTime = clamp(int(o.wagerTime, 8), 4, 20);
@@ -168,6 +169,7 @@ module.exports = function createQuiz(deps) {
       };
       if (cq.type === 'mc') { question.options = showQ ? cq.a : null; question.answer = reveal ? cq.k : null; }
       else if (cq.type === 'emoji') { question.emoji = cq.emoji; question.options = showQ ? cq.a : null; question.answer = reveal ? cq.k : null; }
+      else if (cq.type === 'video') { question.yt = showQ ? cq.yt : null; question.options = showQ ? cq.a : null; question.answer = reveal ? cq.k : null; }
       else if (cq.type === 'tf') { question.options = showQ ? ['Richtig', 'Falsch'] : null; question.answer = reveal ? (cq.tf ? 0 : 1) : null; }
       else if (cq.type === 'est') { question.unit = cq.unit || ''; question.answer = reveal ? cq.val : null; }
       else if (cq.type === 'list') { question.target = cq.n || Math.min(cq.items.length, 10); question.items = reveal ? cq.items : null; }
@@ -256,7 +258,7 @@ module.exports = function createQuiz(deps) {
     for (const p of eligible(room)) {
       const dm = p.doubleActive ? 2 : 1;
       let isCorrect = false, profit = 0;
-      if (cq.type === 'mc' || cq.type === 'tf' || cq.type === 'emoji') {
+      if (cq.type === 'mc' || cq.type === 'tf' || cq.type === 'emoji' || cq.type === 'video') {
         const correctIdx = cq.type === 'tf' ? tfCorrect : cq.k;
         isCorrect = p.locked && p.answer >= 0 && p.answer === correctIdx;
         if (isCorrect) {
@@ -397,7 +399,7 @@ module.exports = function createQuiz(deps) {
 
     socket.on('quiz:answer', (data) => {
       const room = rooms.get(socket.data.quizCode); if (!room || room.phase !== 'question') return;
-      if (!room.currentQ || !['mc', 'tf', 'emoji'].includes(room.currentQ.type)) return;
+      if (!room.currentQ || !['mc', 'tf', 'emoji', 'video'].includes(room.currentQ.type)) return;
       const p = room.players.get(socket.id); if (!p || p.eliminated || p.spectator || p.locked) return;
       const max = room.currentQ.type === 'tf' ? 1 : 3;
       const idx = int(data && data.index, -1); if (idx < 0 || idx > max) return;
@@ -442,7 +444,7 @@ module.exports = function createQuiz(deps) {
           p.powerups.double -= 1; p.doubleActive = true; fxTo(socket.id, { type: 'doubleArmed' }); broadcast(room);
         }
       } else if (type === 'fifty') {
-        if (room.phase === 'question' && room.currentQ && (room.currentQ.type === 'mc' || room.currentQ.type === 'emoji') && !p.locked && p.powerups.fifty > 0) {
+        if (room.phase === 'question' && room.currentQ && ['mc', 'emoji', 'video'].includes(room.currentQ.type) && !p.locked && p.powerups.fifty > 0) {
           p.powerups.fifty -= 1;
           const wrong = [0, 1, 2, 3].filter(i => i !== room.currentQ.k);
           const remove = shuffle(wrong).slice(0, 2);

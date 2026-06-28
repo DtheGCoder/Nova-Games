@@ -174,7 +174,7 @@ function renderPlay(room, reveal) {
   $('#q-text').textContent = room.question.q || '';
   const blocked = !me || me.locked || me.spectator || me.eliminated;
 
-  const isMC = (type === 'mc' || type === 'tf' || type === 'emoji');
+  const isMC = (type === 'mc' || type === 'tf' || type === 'emoji' || type === 'video');
   // toggle input areas
   $('#q-options').style.display = isMC ? 'grid' : 'none';
   $('#q-estimate').classList.toggle('hidden', type !== 'est');
@@ -183,8 +183,18 @@ function renderPlay(room, reveal) {
   const em = $('#q-emoji-media');
   if (type === 'emoji') { em.classList.remove('hidden'); if (em._e !== room.question.emoji) { em._e = room.question.emoji; em.innerHTML = `<div class="emo">${esc(room.question.emoji || '')}</div>`; } }
   else { em.classList.add('hidden'); em._e = null; }
-  // 50:50 for mc & emoji
-  $('#q-pu-fifty').style.display = ((type === 'mc' || type === 'emoji') && room.settings.powerups) ? '' : 'none';
+  // video embed
+  const vm = $('#q-video-media');
+  if (type === 'video' && room.question.yt) {
+    vm.classList.remove('hidden');
+    if (vm._v !== room.question.yt) {
+      vm._v = room.question.yt; const id = encodeURIComponent(room.question.yt);
+      vm.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1" title="Video" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` +
+        `<a class="q-video-fallback" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">▶ Auf YouTube ansehen</a>`;
+    }
+  } else { vm.classList.add('hidden'); vm._v = null; vm.innerHTML = ''; }
+  // 50:50 for mc, emoji & video
+  $('#q-pu-fifty').style.display = ((type === 'mc' || type === 'emoji' || type === 'video') && room.settings.powerups) ? '' : 'none';
   $('#q-pu-double').style.display = room.settings.powerups ? '' : 'none';
   $('#q-powerups').style.display = room.settings.powerups ? 'flex' : 'none';
 
