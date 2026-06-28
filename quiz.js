@@ -19,16 +19,44 @@ const POOL = [
 const TYPE_LABEL = { mc: 'Multiple Choice', tf: 'Wahr oder Falsch', est: 'Schätzfrage', list: 'Top-Liste' };
 
 function normalize(s) {
-  return (s || '').toString().toLowerCase().trim().replace(/[.!?,;:"'`]/g, '').replace(/\s+/g, ' ').replace(/ß/g, 'ss');
+  return (s || '').toString().toLowerCase().trim().replace(/[.!?,;:"'`]/g, '').replace(/\s+/g, ' ').replace(/ß/g, 'ss').replace(/[-_/]/g, ' ').trim();
 }
-function matchListItem(guess, items, foundSet) {
+// Levenshtein edit distance (capped, cheap for short strings)
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 3) return 99;
+  const dp = Array.from({ length: m + 1 }, (_, i) => i);
+  for (let j = 1; j <= n; j++) {
+    let prev = dp[0]; dp[0] = j;
+    for (let i = 1; i <= m; i++) {
+      const tmp = dp[i];
+      dp[i] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[i], dp[i - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[m];
+}
+// returns the ORIGINAL matched item (so the client can place it in its slot), or null
+function matchListItem(guess, items, foundNorms) {
   const g = normalize(guess); if (g.length < 2) return null;
+  let fuzzyBest = null, fuzzyScore = Infinity;
   for (const it of items) {
     const ni = normalize(it);
-    if (foundSet.has(ni)) continue;
-    if (ni === g || (g.length >= 3 && ni.includes(g)) || (ni.length >= 3 && g.includes(ni))) return ni;
+    if (foundNorms.has(ni)) continue;
+    // exact or partial (covers "BMW" for "BMW AG", "delfin" in "delfin/delphin")
+    if (ni === g) return it;
+    if ((g.length >= 3 && ni.includes(g)) || (ni.length >= 3 && g.includes(ni))) return it;
+    // word-level partial: any word of the item equals the guess (e.g. "ag" ignored, "bmw" hits)
+    if (g.length >= 3 && ni.split(' ').includes(g)) return it;
+    // fuzzy: tolerate typos when lengths are close
+    const maxLen = Math.max(g.length, ni.length), minLen = Math.min(g.length, ni.length);
+    if (maxLen >= 4 && (maxLen - minLen) <= 2) {
+      const tol = maxLen <= 6 ? 1 : 2;
+      const d = lev(g, ni);
+      if (d <= tol && d < fuzzyScore) { fuzzyBest = it; fuzzyScore = d; }
+    }
   }
-  return null;
+  return fuzzyBest;
 }
 
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
@@ -283,13 +311,7 @@ module.exports = function createQuiz(deps) {
     for (const p of room.players.values()) { p.eliminated = false; p.spectator = false; p.anted = false; p.streak = 0; p.correctCount = 0; }
     broadcast(room);
     fx(room, { type: 'gameOver', winner: winnerName, pool: room.winner.pool });
-    // safety net: drop back to lobby if nobody starts a rematch
-    setTimer(room, 45, () => {
-      if (room.phase !== 'gameover') return;
-      room.phase = 'lobby'; room.winner = null;
-      for (const p of room.players.values()) p.chips = room.settings.mode === 'cash' ? room.settings.startingChips : 0;
-      broadcast(room);
-    });
+    // stay on the gameover screen with a working "Neue Runde" button — no auto-drop to lobby
   }
 
   /* ----------------------------- leave ----------------------------- */
@@ -350,7 +372,9 @@ module.exports = function createQuiz(deps) {
     });
 
     socket.on('quiz:start', () => {
-      const room = rooms.get(socket.data.quizCode); if (!room || room.hostId !== socket.id || room.matchActive) return;
+      const room = rooms.get(socket.data.quizCode); if (!room || room.matchActive) return;
+      if (!room.players.get(socket.id)) return;                 // any player in the room may start the next game
+      if (room.phase !== 'lobby' && room.phase !== 'gameover') return;
       if (eligible(room).length < 1) return;
       startMatch(room);
     });
@@ -400,9 +424,9 @@ module.exports = function createQuiz(deps) {
       const g = normalize(raw); if (g.length < 2) return;
       if (p.guessed.includes(g)) { fxTo(socket.id, { type: 'listdup' }); return; }
       p.guessed.push(g);
-      const foundSet = new Set(p.found);
-      const m = matchListItem(raw, room.currentQ.items, foundSet);
-      if (m) { p.found.push(m); fxTo(socket.id, { type: 'listmatch', item: raw.trim(), count: p.found.length, target: room.currentQ.n || Math.min(room.currentQ.items.length, 10) }); broadcast(room); }
+      const foundNorms = new Set(p.found.map(normalize));
+      const m = matchListItem(raw, room.currentQ.items, foundNorms);
+      if (m) { p.found.push(m); fxTo(socket.id, { type: 'listmatch', item: m, count: p.found.length, target: room.currentQ.n || Math.min(room.currentQ.items.length, 10) }); broadcast(room); }
       else { fxTo(socket.id, { type: 'listmiss', text: raw.trim() }); }
     });
 

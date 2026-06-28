@@ -81,7 +81,7 @@ function joinQuiz() {
     else { const m = { no_room: 'Raum nicht gefunden', full: 'Raum voll', already_in: 'Schon im Raum', broke: 'Zu wenig Geld' }; $('#q-enter-error').textContent = (res && (m[res.error] || res.message)) || 'Fehlgeschlagen'; }
   });
 }
-function enterQuiz() { N.showScreen('screen-quiz'); $('#q-chat-fab').style.display = 'none'; if (Q.room) render(); }
+function enterQuiz() { N.showScreen('screen-quiz'); if (Q.room) render(); }
 
 /* ============================ HELPERS ============================ */
 function myP() { return Q.room ? Q.room.players.find(p => p.id === Q.me) : null; }
@@ -126,9 +126,9 @@ function renderLobby(room) {
   const lp = $('#q-lobby-players'); lp.innerHTML = '';
   room.players.forEach(p => { const c = document.createElement('div'); c.className = 'lobby-chip' + (p.anted || room.mode === 'cash' ? ' ready' : ''); c.innerHTML = `${p.isHost ? `<span class="crown">${ic('crown')}</span>` : ''}${esc(p.name)}${p.spectator ? ' 👁' : ''}`; lp.appendChild(c); });
   const isHost = me && me.isHost;
-  $('#q-start').classList.toggle('hidden', !isHost);
+  $('#q-start').classList.remove('hidden');                 // anyone can start
   $('#q-settings-open').classList.toggle('hidden', !isHost);
-  $('#q-lobby-wait').textContent = isHost ? 'Starte, wenn alle bereit sind' : 'Warte auf Host…';
+  $('#q-lobby-wait').textContent = 'Starte, wenn alle bereit sind';
 }
 
 function renderWager(room) {
@@ -259,25 +259,34 @@ function submitEstimate() {
 $('#q-est-submit').addEventListener('click', submitEstimate);
 $('#q-est-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitEstimate(); });
 
+function listNorm(s) { return (s || '').toString().toLowerCase().trim().replace(/ß/g, 'ss').replace(/[-_/.]/g, ' ').replace(/\s+/g, ' ').trim(); }
 function renderList(room, reveal, me) {
   const target = room.question.target || 10;
   if (Q.listRound !== room.round) { Q.listRound = room.round; Q.myFound = []; $('#q-list-input').value = ''; }
   const inp = $('#q-list-input'), add = $('#q-list-add');
   const blocked = reveal || (me && (me.locked || me.spectator || me.eliminated));
   inp.disabled = !!blocked; add.disabled = !!blocked;
-  const foundCount = me ? me.foundCount : 0;
-  $('#q-list-progress').innerHTML = `Gefunden <b>${foundCount}</b> / ${target}` + (reveal ? '' : ' — nenne so viele wie möglich!');
-  const fb = $('#q-list-found');
-  if (reveal) {
-    // show full list, highlight found (client knows own found via Q.myFound normalized)
-    const norm = s => (s || '').toLowerCase().trim().replace(/ß/g, 'ss');
-    const mine = new Set(Q.myFound.map(norm));
-    fb.innerHTML = (room.question.items || []).map(it => {
-      const hit = [...mine].some(m => norm(it).includes(m) || m.includes(norm(it)));
-      return `<span class="lf ${hit ? 'hit' : 'miss'}">${esc(it)}</span>`;
+  const foundCount = me ? me.foundCount : Q.myFound.length;
+  $('#q-list-progress').innerHTML = `Gefunden <b>${foundCount}</b> / ${target}` + (reveal ? '' : ' — fülle die Liste!');
+  const wrap = $('#q-list-found'); wrap.classList.add('numbered');
+
+  if (reveal && room.question.items) {
+    // numbered Top-list 1..N, mark which I found, reveal the missing ones
+    const canon = room.question.items.slice(0, target);
+    const mineN = Q.myFound.map(listNorm);
+    wrap.innerHTML = canon.map((it, i) => {
+      const c = listNorm(it);
+      const hit = mineN.some(m => c === m || (m.length >= 3 && c.includes(m)) || (c.length >= 3 && m.includes(c)));
+      return `<div class="lrow ${hit ? 'hit' : 'miss'}"><span class="ln">${i + 1}</span><span class="lt">${esc(it)}</span>${hit ? `<span class="lc">${ic('check')}</span>` : ''}</div>`;
     }).join('');
   } else {
-    fb.innerHTML = Q.myFound.map(f => `<span class="lf hit">${esc(f)}</span>`).join('');
+    // during play: numbered slots fill up as you find answers; empty slots show what's left
+    const slots = new Array(target).fill(null);
+    Q.myFound.forEach((f, i) => { if (i < target) slots[i] = f; });
+    wrap.innerHTML = slots.map((s, i) => s
+      ? `<div class="lrow hit"><span class="ln">${i + 1}</span><span class="lt">${esc(s)}</span><span class="lc">${ic('check')}</span></div>`
+      : `<div class="lrow empty"><span class="ln">${i + 1}</span><span class="lt">— — —</span></div>`
+    ).join('');
   }
 }
 function submitListGuess() {
@@ -303,10 +312,9 @@ function renderGameover(room) {
     row.innerHTML = `<div class="r">${medal}</div><div class="n">${esc(p.name)}<small>${p.correct} richtig · beste Serie ${p.best}</small></div><div class="c"><span class="mini-icon">${ic('coins')}</span>${fmt(p.chips)}</div>`;
     rk.appendChild(row);
   });
-  const isHost = me && me.isHost;
-  $('#q-rematch').classList.toggle('hidden', !isHost);
+  $('#q-rematch').classList.remove('hidden');   // anyone can start the next round
   $('#q-rematch').disabled = false;
-  $('#q-rematch-wait').classList.toggle('hidden', !!isHost);
+  $('#q-rematch-wait').classList.add('hidden');
 }
 
 function renderPlayers(room) {
@@ -434,10 +442,6 @@ $('#q-settings-open').addEventListener('click', () => {
   $('#modal-qsettings').classList.add('open'); Sound.button();
 });
 $('#q-save-settings').addEventListener('click', () => { socket.emit('quiz:settings', qDraft); $('#modal-qsettings').classList.remove('open'); Sound.button(); });
-
-/* emotes */
-$('#q-emote-fab').addEventListener('click', () => { $('#q-emote-popup').classList.toggle('open'); Sound.button(); });
-(function buildEmotes() { const pop = $('#q-emote-popup'); pop.innerHTML = ''; N.ICON.EMOTE_LIST.forEach(name => { const b = document.createElement('button'); b.innerHTML = N.ICON.emote(name); b.onclick = () => { socket.emit('quiz:emote', { emoji: name }); pop.classList.remove('open'); vibrate(8); }; pop.appendChild(b); }); })();
 
 $$('[data-close]').forEach(b => b.addEventListener('click', () => { const el = $('#' + b.dataset.close); if (el) el.classList.remove('open'); }));
 
