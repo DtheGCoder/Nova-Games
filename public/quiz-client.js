@@ -102,6 +102,8 @@ function render() {
   } else chip.style.display = 'none';
   $('#screen-quiz').style.setProperty('--qcat', (room.question && room.question.color) || '#28d695');
 
+  // stop any audio between rounds (wager/lobby/gameover)
+  if (room.phase === 'wager' || room.phase === 'lobby' || room.phase === 'gameover') audioDestroy();
   // panels
   showPanel(room.phase);
   if (room.phase === 'lobby') renderLobby(room);
@@ -168,6 +170,28 @@ $('#q-wager-slider').addEventListener('input', e => { $('#q-wager-val').textCont
 $('#q-wager-slider').addEventListener('change', e => setWager(+e.target.value));
 $('#q-pu-double-w').addEventListener('click', () => { socket.emit('quiz:powerup', { type: 'double' }); Sound.chip(); });
 
+/* ---- audio-only player via YouTube IFrame API (invisible player, our own button) ---- */
+let _ytAudio = null;
+function ensureYTApi(cb) {
+  if (window.YT && window.YT.Player) return cb();
+  if (!document.getElementById('yt-iframe-api')) { const s = document.createElement('script'); s.id = 'yt-iframe-api'; s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); }
+  let n = 0; const t = setInterval(() => { if (window.YT && window.YT.Player) { clearInterval(t); cb(); } else if (++n > 80) clearInterval(t); }, 150);
+}
+function audioDestroy() { if (_ytAudio) { try { _ytAudio.destroy(); } catch (e) {} _ytAudio = null; } }
+function audioSetup(id) {
+  audioDestroy();
+  ensureYTApi(() => {
+    if (!document.getElementById('q-yt-audio')) return;
+    try { _ytAudio = new YT.Player('q-yt-audio', { width: '100%', height: '100%', videoId: id, playerVars: { playsinline: 1, controls: 0, rel: 0, fs: 0, modestbranding: 1 }, events: {} }); } catch (e) {}
+  });
+}
+function audioToggle(btn) {
+  if (!_ytAudio || !_ytAudio.getPlayerState) return;
+  let st = -1; try { st = _ytAudio.getPlayerState(); } catch (e) {}
+  if (st === 1) { try { _ytAudio.pauseVideo(); } catch (e) {} if (btn) btn.textContent = '▶ Weiter'; }
+  else { try { _ytAudio.unMute(); _ytAudio.setVolume(100); _ytAudio.playVideo(); } catch (e) {} if (btn) btn.textContent = '⏸ Pause'; }
+}
+
 function renderPlay(room, reveal) {
   const me = myP();
   const type = room.question.type || 'mc';
@@ -183,26 +207,37 @@ function renderPlay(room, reveal) {
   const em = $('#q-emoji-media');
   if (type === 'emoji') { em.classList.remove('hidden'); if (em._e !== room.question.emoji) { em._e = room.question.emoji; em.innerHTML = `<div class="emo">${esc(room.question.emoji || '')}</div>`; } }
   else { em.classList.add('hidden'); em._e = null; }
-  // video / intro / audio embed
+  // video / intro = visible iframe; audio = invisible API player + own button
   const vm = $('#q-video-media');
-  if ((type === 'video' || type === 'intro' || type === 'audio') && room.question.yt) {
-    vm.classList.remove('hidden');
+  if ((type === 'video' || type === 'intro') && room.question.yt) {
+    audioDestroy();
+    vm.classList.remove('hidden'); vm.classList.remove('audio-mode');
     const key = type + ':' + room.question.yt;
     if (vm._v !== key) {
       vm._v = key; const id = encodeURIComponent(room.question.yt);
       let params = 'rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=0';
       if (type === 'intro') params += `&autoplay=1&mute=1&start=0&end=${room.question.ytEnd || 8}`;
-      if (type === 'audio' && room.question.ytEnd) params += `&end=${room.question.ytEnd}`;
       vm.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?${params}" title="Clip" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` +
         `<div class="q-video-cover"></div>` +
         (type === 'intro' ? `<div class="q-intro-badge">🔊 zum Hören antippen</div>` : '') +
-        (type === 'audio' ? `<div class="q-audio-cover"><div class="ac-icon">🎧</div><div class="ac-txt">Tippe zum Abspielen</div><div class="ac-sub">nur Ton — errate es!</div></div>` : '') +
         `<a class="q-video-fallback" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">▶ YouTube</a>`;
     }
-    // reveal the hidden video for audio questions once the round is over
-    const ac = vm.querySelector('.q-audio-cover');
-    if (ac) ac.style.display = reveal ? 'none' : 'flex';
-  } else { vm.classList.add('hidden'); vm._v = null; vm.innerHTML = ''; }
+  } else if (type === 'audio' && room.question.yt) {
+    vm.classList.remove('hidden'); vm.classList.add('audio-mode');
+    const key = 'audio:' + room.question.yt;
+    if (vm._v !== key) {
+      vm._v = key;
+      vm.innerHTML = `<div id="q-yt-audio"></div>` +
+        `<div class="q-audio-card"><div class="ac-icon">🎧</div><button class="q-audio-play" id="q-audio-play">▶ Ton abspielen</button><div class="ac-sub">nur Ton — errate es!</div></div>`;
+      audioSetup(room.question.yt);
+      const b = document.getElementById('q-audio-play'); if (b) b.onclick = () => audioToggle(b);
+    }
+    if (reveal) { // round over: stop sound and reveal the clip
+      try { if (_ytAudio && _ytAudio.pauseVideo) _ytAudio.pauseVideo(); } catch (e) {}
+      const card = vm.querySelector('.q-audio-card'); if (card) card.style.display = 'none';
+      const pl = document.getElementById('q-yt-audio'); if (pl) pl.style.opacity = '1';
+    }
+  } else { vm.classList.add('hidden'); vm.classList.remove('audio-mode'); vm._v = null; vm.innerHTML = ''; audioDestroy(); }
   // 50:50 for mc, emoji, video, intro & audio
   $('#q-pu-fifty').style.display = ((type === 'mc' || type === 'emoji' || type === 'video' || type === 'intro' || type === 'audio') && room.settings.powerups) ? '' : 'none';
   $('#q-pu-double').style.display = room.settings.powerups ? '' : 'none';
@@ -458,8 +493,8 @@ function onEmote(playerId, name) { const el = $(`.qp[data-pid="${playerId}"]`); 
 /* ============================ CONTROLS ============================ */
 $('#q-start').addEventListener('click', () => { socket.emit('quiz:start'); Sound.button(); });
 $('#q-rematch').addEventListener('click', () => { socket.emit('quiz:start'); Sound.button(); $('#q-rematch').disabled = true; });
-$('#q-tohub').addEventListener('click', () => { socket.emit('quiz:leave'); Q.room = null; Q.me = null; N.showScreen('screen-hub'); setTimeout(() => { N.refreshMe(); N.loadHub(); }, 400); Sound.button(); });
-$('#q-leave').addEventListener('click', () => { if (confirm('Quiz verlassen?')) { socket.emit('quiz:leave'); Q.room = null; Q.me = null; N.showScreen('screen-hub'); setTimeout(() => { N.refreshMe(); N.loadHub(); }, 400); } });
+$('#q-tohub').addEventListener('click', () => { audioDestroy(); socket.emit('quiz:leave'); Q.room = null; Q.me = null; N.showScreen('screen-hub'); setTimeout(() => { N.refreshMe(); N.loadHub(); }, 400); Sound.button(); });
+$('#q-leave').addEventListener('click', () => { if (confirm('Quiz verlassen?')) { audioDestroy(); socket.emit('quiz:leave'); Q.room = null; Q.me = null; N.showScreen('screen-hub'); setTimeout(() => { N.refreshMe(); N.loadHub(); }, 400); } });
 $('#q-copy').addEventListener('click', () => { const code = Q.room && Q.room.code; if (!code) return; const url = location.origin + '/#Q' + code; if (navigator.clipboard) navigator.clipboard.writeText(url); toast('Link kopiert!', 'good', false, 'copy'); Sound.button(); });
 $('#q-board-btn').addEventListener('click', () => { openBoard(); Sound.button(); });
 
