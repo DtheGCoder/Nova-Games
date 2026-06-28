@@ -9,8 +9,8 @@
   <title>NOVA · Casino</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=8" />
-  <link rel="stylesheet" href="quiz.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="quiz.css?v=9" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>" />
 </head>
 <body>
@@ -227,7 +227,7 @@
         <div id="q-buyin-row" class="buyin-row hidden"><span>Buy-in</span><div class="seg" id="q-buyin-seg"></div></div>
         <div class="q-setrow"><span>Spielmodus</span>
           <div class="seg wrap" id="q-type-seg">
-            <button data-t="mixed" class="on">Gemischt</button><button data-t="mc">Quiz</button><button data-t="list">Top-Listen</button><button data-t="est">Schätzen</button><button data-t="tf">Wahr/Falsch</button>
+            <button data-t="mixed" class="on">Gemischt</button><button data-t="mc">Quiz</button><button data-t="list">Top-Listen</button><button data-t="est">Schätzen</button><button data-t="tf">Wahr/Falsch</button><button data-t="emoji">Emoji 🎬</button>
           </div>
         </div>
         <div class="q-setrow"><span>Kategorie</span><select id="q-cat-sel" class="q-select"></select></div>
@@ -291,6 +291,7 @@
 
       <!-- PLAY (question + reveal) -->
       <div id="q-play" class="q-panel hidden">
+        <div class="q-emoji-media hidden" id="q-emoji-media"></div>
         <div class="q-question-text" id="q-text"></div>
         <div class="q-options" id="q-options"></div>
 
@@ -302,6 +303,7 @@
             <button id="q-est-submit" class="btn btn-gold">Tippen</button>
           </div>
           <div class="q-est-hint" id="q-est-hint">Am nächsten dran gewinnt am meisten.</div>
+          <div class="q-est-gauge hidden" id="q-est-gauge"></div>
         </div>
 
         <!-- top-list input -->
@@ -340,6 +342,7 @@
     </main>
 
     <div class="q-players-strip" id="q-players"></div>
+    <div class="q-flash" id="q-flash"></div>
   </section>
 
   <!-- ============ MODAL: QUIZ TABLE BOARD ============ -->
@@ -417,8 +420,8 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="icons.js?v=8"></script>
-  <script src="app.js?v=8"></script>
-  <script src="quiz-client.js?v=8"></script>
+  <script src="icons.js?v=9"></script>
+  <script src="app.js?v=9"></script>
+  <script src="quiz-client.js?v=9"></script>
 </body>
 </html>

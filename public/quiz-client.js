@@ -100,6 +100,7 @@ function render() {
     chip.style.color = room.question.color;
     chip.innerHTML = `<span class="ci">${ic(room.question.icon || 'star')}</span>${esc(room.question.category)}`;
   } else chip.style.display = 'none';
+  $('#screen-quiz').style.setProperty('--qcat', (room.question && room.question.color) || '#28d695');
 
   // panels
   showPanel(room.phase);
@@ -173,16 +174,21 @@ function renderPlay(room, reveal) {
   $('#q-text').textContent = room.question.q || '';
   const blocked = !me || me.locked || me.spectator || me.eliminated;
 
-  // toggle the three input areas
-  $('#q-options').style.display = (type === 'mc' || type === 'tf') ? 'grid' : 'none';
+  const isMC = (type === 'mc' || type === 'tf' || type === 'emoji');
+  // toggle input areas
+  $('#q-options').style.display = isMC ? 'grid' : 'none';
   $('#q-estimate').classList.toggle('hidden', type !== 'est');
   $('#q-list').classList.toggle('hidden', type !== 'list');
-  // 50:50 only for mc
-  $('#q-pu-fifty').style.display = (type === 'mc' && room.settings.powerups) ? '' : 'none';
+  // emoji media banner
+  const em = $('#q-emoji-media');
+  if (type === 'emoji') { em.classList.remove('hidden'); if (em._e !== room.question.emoji) { em._e = room.question.emoji; em.innerHTML = `<div class="emo">${esc(room.question.emoji || '')}</div>`; } }
+  else { em.classList.add('hidden'); em._e = null; }
+  // 50:50 for mc & emoji
+  $('#q-pu-fifty').style.display = ((type === 'mc' || type === 'emoji') && room.settings.powerups) ? '' : 'none';
   $('#q-pu-double').style.display = room.settings.powerups ? '' : 'none';
   $('#q-powerups').style.display = room.settings.powerups ? 'flex' : 'none';
 
-  if (type === 'mc' || type === 'tf') renderOptions(room, reveal, me, type);
+  if (isMC) renderOptions(room, reveal, me, type);
   else if (type === 'est') renderEstimate(room, reveal, me);
   else if (type === 'list') renderList(room, reveal, me);
 
@@ -237,19 +243,45 @@ function answer(i) {
 
 function renderEstimate(room, reveal, me) {
   $('#q-est-unit').textContent = room.question.unit || '';
-  const inp = $('#q-est-input'), btn = $('#q-est-submit'), hint = $('#q-est-hint');
+  const inp = $('#q-est-input'), btn = $('#q-est-submit'), hint = $('#q-est-hint'), gauge = $('#q-est-gauge');
   if (reveal) {
     inp.disabled = true; btn.disabled = true;
-    const correct = room.question.answer;
-    const mine = me && me.estimate;
-    hint.innerHTML = `Richtig: <b>${fmt(correct)} ${esc(room.question.unit || '')}</b>` + (mine != null ? ` · Dein Tipp: <b>${fmt(mine)}</b>` : '');
+    const correct = Number(room.question.answer) || 0;
+    const mine = (me && me.estimate != null) ? Number(me.estimate) : null;
+    const unit = room.question.unit || '';
+    gauge.classList.remove('hidden');
+    if (gauge._r !== room.round) {
+      gauge._r = room.round;
+      const maxV = (Math.max(correct, mine || 0) * 1.15) || 1;
+      const cPct = Math.max(3, Math.min(97, correct / maxV * 100));
+      const mPct = mine != null ? Math.max(3, Math.min(97, mine / maxV * 100)) : null;
+      gauge.innerHTML = `<div class="gline"></div>` +
+        (mPct != null ? `<div class="gmark you" style="left:0%"><span class="gdot"></span><span class="glab">Du</span></div>` : '') +
+        `<div class="gmark correct" style="left:0%"><span class="gdot"></span><span class="glab">Lösung</span></div>`;
+      requestAnimationFrame(() => {
+        const cm = gauge.querySelector('.gmark.correct'); if (cm) cm.style.left = cPct + '%';
+        const ym = gauge.querySelector('.gmark.you'); if (ym && mPct != null) ym.style.left = mPct + '%';
+      });
+      countUpEst(hint, correct, unit, mine);
+    }
   } else {
+    gauge.classList.add('hidden'); gauge._r = null;
     const locked = me && me.locked;
     inp.disabled = !!locked || (me && (me.spectator || me.eliminated));
     btn.disabled = inp.disabled;
     btn.textContent = locked ? 'Getippt ✓' : 'Tippen';
     hint.textContent = locked ? 'Dein Tipp ist abgegeben.' : 'Am nächsten dran gewinnt am meisten.';
   }
+}
+function countUpEst(el, to, unit, mine) {
+  const dur = 1100, start = performance.now();
+  const step = (t) => {
+    const p = Math.min(1, (t - start) / dur);
+    const v = Math.round(to * (1 - Math.pow(1 - p, 3)));
+    el.innerHTML = `Lösung: <b>${fmt(v)} ${esc(unit)}</b>` + (mine != null ? ` · Dein Tipp: <b>${fmt(mine)}</b>` : '');
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 function submitEstimate() {
   const me = myP(); if (!me || me.locked || Q.room.phase !== 'question' || Q.room.question.type !== 'est') return;
@@ -383,11 +415,16 @@ function onFx(e) {
   }
 }
 function applyFifty() { const grid = $('#q-options'); Q.fiftyRemoved.forEach(i => { const el = grid.querySelector(`.q-opt[data-i="${i}"]`); if (el) el.classList.add('removed'); }); }
+function flashScreen(kind) {
+  const f = $('#q-flash'); if (!f) return;
+  f.className = 'q-flash ' + kind; void f.offsetWidth; f.classList.add('show');
+  setTimeout(() => f.classList.remove('show'), 700);
+}
 function revealFx() {
   const me = myP();
   if (me && !me.spectator && !me.eliminated) {
-    if (me.correct) { Sound.win(); vibrate([20, 40, 20]); if (me.roundDelta > 0) FX.burst(innerWidth / 2, innerHeight / 2, 50); }
-    else { Sound.lose(); vibrate(100); }
+    if (me.correct) { Sound.win(); vibrate([20, 40, 20]); flashScreen('good'); FX.burst(innerWidth / 2, innerHeight * 0.4, 60); }
+    else { Sound.lose(); vibrate(100); flashScreen('bad'); }
   }
 }
 function gameoverFx(e) {
