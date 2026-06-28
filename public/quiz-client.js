@@ -21,8 +21,8 @@ const CATS = [
 let socket = null;
 const Q = {
   code: null, me: null, room: null, timerRAF: null,
-  enter: { mode: 'cash', buyIn: 1000, cat: 'mixed', diff: 'mixed', rounds: 10 },
-  fiftyRemoved: [], lastResultRound: -1,
+  enter: { mode: 'cash', buyIn: 1000, cat: 'mixed', diff: 'mixed', rounds: 10, qtype: 'mixed' },
+  fiftyRemoved: [], lastResultRound: -1, myFound: [], listRound: -1,
 };
 
 /* ============================ SOCKET BIND ============================ */
@@ -35,7 +35,7 @@ function bindSocket(s) {
 /* ============================ ENTER MODAL ============================ */
 const BUYINS = [500, 1000, 2500, 5000];
 function openEnter() {
-  Q.enter = { mode: 'cash', buyIn: 1000, cat: 'mixed', diff: 'mixed', rounds: 10 };
+  Q.enter = { mode: 'cash', buyIn: 1000, cat: 'mixed', diff: 'mixed', rounds: 10, qtype: 'mixed' };
   // category select
   const sel = $('#q-cat-sel'); sel.innerHTML = CATS.map(([id, n]) => `<option value="${id}">${n}</option>`).join('');
   // buyin seg
@@ -45,6 +45,7 @@ function openEnter() {
   $('#q-buyin-row').classList.add('hidden');
   $$('#q-diff-seg button').forEach(b => b.classList.toggle('on', b.dataset.d === 'mixed'));
   $$('#q-rounds-seg button').forEach(b => b.classList.toggle('on', b.dataset.r === '10'));
+  $$('#q-type-seg button').forEach(b => b.classList.toggle('on', b.dataset.t === 'mixed'));
   $('#q-enter-error').textContent = '';
   $('#modal-quiz-enter').classList.add('open'); Sound.button();
 }
@@ -55,10 +56,11 @@ $$('.mode-opt[data-qmode]').forEach(b => b.addEventListener('click', () => {
 $('#q-cat-sel').addEventListener('change', e => Q.enter.cat = e.target.value);
 $$('#q-diff-seg button').forEach(b => b.addEventListener('click', () => { Q.enter.diff = b.dataset.d; $$('#q-diff-seg button').forEach(x => x.classList.toggle('on', x === b)); Sound.button(); }));
 $$('#q-rounds-seg button').forEach(b => b.addEventListener('click', () => { Q.enter.rounds = +b.dataset.r; $$('#q-rounds-seg button').forEach(x => x.classList.toggle('on', x === b)); Sound.button(); }));
+$$('#q-type-seg button').forEach(b => b.addEventListener('click', () => { Q.enter.qtype = b.dataset.t; $$('#q-type-seg button').forEach(x => x.classList.toggle('on', x === b)); Sound.button(); }));
 
 $('#q-create').addEventListener('click', () => {
   Sound.button();
-  const settings = { mode: Q.enter.mode, buyIn: Q.enter.buyIn, category: Q.enter.cat, difficulty: Q.enter.diff, totalRounds: Q.enter.rounds };
+  const settings = { mode: Q.enter.mode, buyIn: Q.enter.buyIn, category: Q.enter.cat, difficulty: Q.enter.diff, totalRounds: Q.enter.rounds, qtype: Q.enter.qtype };
   socket.emit('quiz:create', { settings }, res => {
     if (res && res.ok) { Q.me = res.playerId; enterQuiz(); $('#modal-quiz-enter').classList.remove('open'); }
     else $('#q-enter-error').textContent = (res && res.message) || 'Konnte Raum nicht erstellen';
@@ -163,62 +165,125 @@ $('#q-pu-double-w').addEventListener('click', () => { socket.emit('quiz:powerup'
 
 function renderPlay(room, reveal) {
   const me = myP();
+  const type = room.question.type || 'mc';
   $('#q-text').textContent = room.question.q || '';
-  const grid = $('#q-options');
-  // rebuild options only when question text changes
-  if (grid._q !== room.question.q) {
-    grid._q = room.question.q; grid.innerHTML = '';
-    (room.question.options || []).forEach((opt, i) => {
-      const b = document.createElement('button'); b.className = 'q-opt'; b.dataset.i = i;
-      b.innerHTML = `<span class="ol">${'ABCD'[i]}</span><span class="ot">${esc(opt)}</span><span class="mark ok">${ic('check')}</span><span class="mark no">${ic('close')}</span>`;
-      b.onclick = () => answer(i);
-      grid.appendChild(b);
-    });
-    // apply any active 50:50 for this question
-    Q.fiftyRemoved.forEach(i => { const el = grid.querySelector(`.q-opt[data-i="${i}"]`); if (el) el.classList.add('removed'); });
-  }
-  const myAnswer = reveal ? me && me.answer : (me && me.locked ? me.answer : -1);
-  $$('.q-opt', grid).forEach(b => {
-    const i = +b.dataset.i;
-    b.classList.toggle('picked', myAnswer === i && (reveal ? true : me && me.locked));
-    if (reveal) {
-      b.classList.add('locked');
-      b.classList.toggle('correct', i === room.question.answer);
-      b.classList.toggle('wrong', i !== room.question.answer);
-    } else {
-      b.classList.remove('correct', 'wrong');
-      b.classList.toggle('locked', !!(me && me.locked) || me && (me.spectator || me.eliminated));
-    }
-  });
-  // powerups visible only during question, before lock
-  const showPU = !reveal && me && !me.locked && !me.spectator && !me.eliminated && room.settings.powerups;
-  $('#q-powerups').style.display = 'flex';
-  $('#q-pu-fifty').style.display = room.settings.powerups ? '' : 'none';
+  const blocked = !me || me.locked || me.spectator || me.eliminated;
+
+  // toggle the three input areas
+  $('#q-options').style.display = (type === 'mc' || type === 'tf') ? 'grid' : 'none';
+  $('#q-estimate').classList.toggle('hidden', type !== 'est');
+  $('#q-list').classList.toggle('hidden', type !== 'list');
+  // 50:50 only for mc
+  $('#q-pu-fifty').style.display = (type === 'mc' && room.settings.powerups) ? '' : 'none';
   $('#q-pu-double').style.display = room.settings.powerups ? '' : 'none';
+  $('#q-powerups').style.display = room.settings.powerups ? 'flex' : 'none';
+
+  if (type === 'mc' || type === 'tf') renderOptions(room, reveal, me, type);
+  else if (type === 'est') renderEstimate(room, reveal, me);
+  else if (type === 'list') renderList(room, reveal, me);
+
   if (me) {
     $('#q-pu-fifty-n').textContent = me.powerups ? me.powerups.fifty : 0;
     $('#q-pu-double-n').textContent = me.doubleActive ? '✓' : (me.powerups ? me.powerups.double : 0);
-    $('#q-pu-fifty').disabled = !showPU || !me.powerups || me.powerups.fifty <= 0;
+    $('#q-pu-fifty').disabled = reveal || blocked || type !== 'mc' || !me.powerups || me.powerups.fifty <= 0;
     $('#q-pu-double').disabled = reveal || !me.powerups || me.powerups.double <= 0 || me.doubleActive || me.locked || me.spectator || me.eliminated;
     $('#q-pu-double').classList.toggle('armed', me.doubleActive);
     $('#q-play-wager').textContent = fmt(me.wager || 0);
   }
+
   // result banner
   const res = $('#q-result');
-  if (reveal && me && !me.spectator && me.roundDelta !== undefined && Q.lastResultRound !== room.round) {
-    // keep showing
-  }
   if (reveal && me && !me.spectator && !me.eliminated) {
-    res.classList.add('show');
     if (me.correct) { res.className = 'q-result show win'; res.innerHTML = `+${fmt(me.roundDelta)} <small>Richtig!${me.streak >= 2 ? ' 🔥 Serie ' + me.streak : ''}</small>`; }
-    else { res.className = 'q-result show lose'; res.innerHTML = `${fmt(me.roundDelta)} <small>${me.answer < 0 ? 'Keine Antwort' : 'Leider falsch'}</small>`; }
+    else { res.className = 'q-result show lose'; res.innerHTML = `${fmt(me.roundDelta)} <small>${revealMissText(type, me)}</small>`; }
   } else { res.className = 'q-result'; res.innerHTML = ''; }
+}
+function revealMissText(type, me) {
+  if (type === 'list') return me.foundCount ? me.foundCount + ' gefunden' : 'Nichts gefunden';
+  if (type === 'est') return me.estimate == null ? 'Keine Schätzung' : 'Zu weit daneben';
+  return (me.answer == null || me.answer < 0) ? 'Keine Antwort' : 'Leider falsch';
+}
+
+function renderOptions(room, reveal, me, type) {
+  const grid = $('#q-options');
+  grid.classList.toggle('two', type === 'tf');
+  if (grid._q !== room.question.q) {
+    grid._q = room.question.q; grid.innerHTML = '';
+    (room.question.options || []).forEach((opt, i) => {
+      const b = document.createElement('button'); b.className = 'q-opt'; b.dataset.i = i;
+      b.innerHTML = `<span class="ol">${type === 'tf' ? (i === 0 ? '✓' : '✗') : 'ABCD'[i]}</span><span class="ot">${esc(opt)}</span><span class="mark ok">${ic('check')}</span><span class="mark no">${ic('close')}</span>`;
+      b.onclick = () => answer(i);
+      grid.appendChild(b);
+    });
+    Q.fiftyRemoved.forEach(i => { const el = grid.querySelector(`.q-opt[data-i="${i}"]`); if (el) el.classList.add('removed'); });
+  }
+  const myAnswer = reveal ? (me && me.answer) : (me && me.locked ? me.answer : -1);
+  $$('.q-opt', grid).forEach(b => {
+    const i = +b.dataset.i;
+    b.classList.toggle('picked', myAnswer === i && (reveal ? true : me && me.locked));
+    if (reveal) { b.classList.add('locked'); b.classList.toggle('correct', i === room.question.answer); b.classList.toggle('wrong', i !== room.question.answer); }
+    else { b.classList.remove('correct', 'wrong'); b.classList.toggle('locked', !!(me && me.locked) || (me && (me.spectator || me.eliminated))); }
+  });
 }
 function answer(i) {
   const me = myP(); if (!me || me.locked || Q.room.phase !== 'question' || me.spectator || me.eliminated) return;
   if (Q.fiftyRemoved.includes(i)) return;
   socket.emit('quiz:answer', { index: i }); Sound.button(); vibrate(12);
 }
+
+function renderEstimate(room, reveal, me) {
+  $('#q-est-unit').textContent = room.question.unit || '';
+  const inp = $('#q-est-input'), btn = $('#q-est-submit'), hint = $('#q-est-hint');
+  if (reveal) {
+    inp.disabled = true; btn.disabled = true;
+    const correct = room.question.answer;
+    const mine = me && me.estimate;
+    hint.innerHTML = `Richtig: <b>${fmt(correct)} ${esc(room.question.unit || '')}</b>` + (mine != null ? ` · Dein Tipp: <b>${fmt(mine)}</b>` : '');
+  } else {
+    const locked = me && me.locked;
+    inp.disabled = !!locked || (me && (me.spectator || me.eliminated));
+    btn.disabled = inp.disabled;
+    btn.textContent = locked ? 'Getippt ✓' : 'Tippen';
+    hint.textContent = locked ? 'Dein Tipp ist abgegeben.' : 'Am nächsten dran gewinnt am meisten.';
+  }
+}
+function submitEstimate() {
+  const me = myP(); if (!me || me.locked || Q.room.phase !== 'question' || Q.room.question.type !== 'est') return;
+  const v = parseFloat($('#q-est-input').value.replace(',', '.')); if (!isFinite(v)) { toast('Zahl eingeben', 'bad'); return; }
+  socket.emit('quiz:estimate', { value: v }); Sound.chip(); vibrate(10);
+}
+$('#q-est-submit').addEventListener('click', submitEstimate);
+$('#q-est-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitEstimate(); });
+
+function renderList(room, reveal, me) {
+  const target = room.question.target || 10;
+  if (Q.listRound !== room.round) { Q.listRound = room.round; Q.myFound = []; $('#q-list-input').value = ''; }
+  const inp = $('#q-list-input'), add = $('#q-list-add');
+  const blocked = reveal || (me && (me.locked || me.spectator || me.eliminated));
+  inp.disabled = !!blocked; add.disabled = !!blocked;
+  const foundCount = me ? me.foundCount : 0;
+  $('#q-list-progress').innerHTML = `Gefunden <b>${foundCount}</b> / ${target}` + (reveal ? '' : ' — nenne so viele wie möglich!');
+  const fb = $('#q-list-found');
+  if (reveal) {
+    // show full list, highlight found (client knows own found via Q.myFound normalized)
+    const norm = s => (s || '').toLowerCase().trim().replace(/ß/g, 'ss');
+    const mine = new Set(Q.myFound.map(norm));
+    fb.innerHTML = (room.question.items || []).map(it => {
+      const hit = [...mine].some(m => norm(it).includes(m) || m.includes(norm(it)));
+      return `<span class="lf ${hit ? 'hit' : 'miss'}">${esc(it)}</span>`;
+    }).join('');
+  } else {
+    fb.innerHTML = Q.myFound.map(f => `<span class="lf hit">${esc(f)}</span>`).join('');
+  }
+}
+function submitListGuess() {
+  const me = myP(); if (!me || Q.room.phase !== 'question' || Q.room.question.type !== 'list' || me.spectator || me.eliminated) return;
+  const t = $('#q-list-input').value.trim(); if (!t) return;
+  socket.emit('quiz:listguess', { text: t }); $('#q-list-input').value = ''; $('#q-list-input').focus();
+}
+$('#q-list-add').addEventListener('click', submitListGuess);
+$('#q-list-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitListGuess(); });
+
 $('#q-pu-fifty').addEventListener('click', () => { socket.emit('quiz:powerup', { type: 'fifty' }); Sound.button(); });
 $('#q-pu-double').addEventListener('click', () => { socket.emit('quiz:powerup', { type: 'double' }); Sound.chip(); });
 
@@ -280,7 +345,10 @@ function renderTimer(room) {
 function onFx(e) {
   switch (e.type) {
     case 'matchStart': toast('Quiz startet!', 'gold', true, 'bolt'); FX.rain(); break;
-    case 'wagerOpen': Q.fiftyRemoved = []; Sound.turn(); break;
+    case 'wagerOpen': Q.fiftyRemoved = []; Q.myFound = []; Sound.turn(); break;
+    case 'listmatch': if (!Q.myFound.includes(e.item)) Q.myFound.push(e.item); Sound.win(); vibrate(12); toast('✓ ' + e.item + ' (' + e.count + '/' + e.target + ')', 'good'); render(); break;
+    case 'listmiss': Sound.lose(); vibrate(40); break;
+    case 'listdup': toast('Schon genannt', '', false); break;
     case 'questionStart': Sound.deal(); break;
     case 'reveal': revealFx(); break;
     case 'locked': toast('Antwort gesperrt', 'good', false, 'check'); break;

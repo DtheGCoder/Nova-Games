@@ -5,8 +5,31 @@
    ========================================================================= */
 'use strict';
 const { CATEGORIES, QUESTIONS } = require('./questions');
+const { TF, EST, LISTS } = require('./quiz-content');
 const CAT_BY_ID = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 const DIFF_LABEL = { 1: 'Leicht', 2: 'Mittel', 3: 'Schwer' };
+
+// unified, typed question pool
+const POOL = [
+  ...QUESTIONS.map(q => ({ ...q, type: 'mc' })),
+  ...TF.map(q => ({ ...q, type: 'tf' })),
+  ...EST.map(q => ({ ...q, type: 'est' })),
+  ...LISTS.map(q => ({ ...q, type: 'list', q: q.topic })),
+];
+const TYPE_LABEL = { mc: 'Multiple Choice', tf: 'Wahr oder Falsch', est: 'Schätzfrage', list: 'Top-Liste' };
+
+function normalize(s) {
+  return (s || '').toString().toLowerCase().trim().replace(/[.!?,;:"'`]/g, '').replace(/\s+/g, ' ').replace(/ß/g, 'ss');
+}
+function matchListItem(guess, items, foundSet) {
+  const g = normalize(guess); if (g.length < 2) return null;
+  for (const it of items) {
+    const ni = normalize(it);
+    if (foundSet.has(ni)) continue;
+    if (ni === g || (g.length >= 3 && ni.includes(g)) || (ni.length >= 3 && g.includes(ni))) return ni;
+  }
+  return null;
+}
 
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -14,7 +37,7 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 
 const DEFAULTS = {
   mode: 'cash', buyIn: 1000, startingChips: 1000,
-  category: 'mixed', difficulty: 'mixed',
+  category: 'mixed', difficulty: 'mixed', qtype: 'mixed',
   totalRounds: 10, questionTime: 18, wagerTime: 8,
   minBet: 50, maxBet: 500, maxPlayers: 8, powerups: true,
 };
@@ -25,6 +48,7 @@ function sanitize(s) {
   o.startingChips = clamp(int(o.startingChips, 1000), 100, 1000000);
   o.category = (o.category === 'mixed' || CAT_BY_ID[o.category]) ? o.category : 'mixed';
   o.difficulty = ['mixed', 'easy', 'medium', 'hard'].includes(o.difficulty) ? o.difficulty : 'mixed';
+  o.qtype = ['mixed', 'mc', 'tf', 'est', 'list'].includes(o.qtype) ? o.qtype : 'mixed';
   o.totalRounds = clamp(int(o.totalRounds, 10), 3, 30);
   o.questionTime = clamp(int(o.questionTime, 18), 8, 40);
   o.wagerTime = clamp(int(o.wagerTime, 8), 4, 20);
@@ -47,11 +71,15 @@ module.exports = function createQuiz(deps) {
     return c;
   }
   function buildDeck(s) {
-    let pool = QUESTIONS;
+    let pool = POOL;
+    if (s.qtype !== 'mixed') pool = pool.filter(q => q.type === s.qtype);
     if (s.category !== 'mixed') pool = pool.filter(q => q.c === s.category);
     const dmap = { easy: 1, medium: 2, hard: 3 };
     if (s.difficulty !== 'mixed') pool = pool.filter(q => q.d === dmap[s.difficulty]);
-    if (pool.length < 3) pool = QUESTIONS; // safety fallback
+    if (pool.length < 3) { // relax filters progressively to always have enough
+      pool = POOL.filter(q => s.qtype === 'mixed' || q.type === s.qtype);
+      if (pool.length < 3) pool = POOL;
+    }
     return shuffle(pool);
   }
   function seated(room) { return room.seatOrder.map(id => room.players.get(id)).filter(Boolean); }
@@ -76,6 +104,7 @@ module.exports = function createQuiz(deps) {
       id: socket.id, socketId: socket.id, account: acc.username, name: acc.username,
       seat: -1, connected: true, chips: 0,
       wager: 0, answer: -1, answerAt: 0, locked: false, correct: null,
+      estimate: null, found: [], guessed: [],
       roundDelta: 0, streak: 0, bestStreak: 0, correctCount: 0,
       eliminated: false, spectator: false, anted: false,
       powerups: { fifty: 2, double: 1 }, doubleActive: false,
@@ -100,19 +129,25 @@ module.exports = function createQuiz(deps) {
     const reveal = room.phase === 'reveal';
     let question = null;
     if (room.currentQ) {
-      const cat = CAT_BY_ID[room.currentQ.c] || { name: room.currentQ.c, color: '#ffd76a', icon: 'star' };
+      const cq = room.currentQ;
+      const cat = CAT_BY_ID[cq.c] || { name: cq.c, color: '#ffd76a', icon: 'star' };
       question = {
-        category: cat.name, categoryId: room.currentQ.c, color: cat.color, icon: cat.icon,
-        difficulty: room.currentQ.d, difficultyLabel: DIFF_LABEL[room.currentQ.d],
-        q: showQ ? room.currentQ.q : null,
-        options: showQ ? room.currentQ.a : null,
-        answer: reveal ? room.currentQ.k : null,
+        type: cq.type, typeLabel: TYPE_LABEL[cq.type],
+        category: cat.name, categoryId: cq.c, color: cat.color, icon: cat.icon,
+        difficulty: cq.d, difficultyLabel: DIFF_LABEL[cq.d],
+        q: showQ ? cq.q : null,
       };
+      if (cq.type === 'mc') { question.options = showQ ? cq.a : null; question.answer = reveal ? cq.k : null; }
+      else if (cq.type === 'tf') { question.options = showQ ? ['Richtig', 'Falsch'] : null; question.answer = reveal ? (cq.tf ? 0 : 1) : null; }
+      else if (cq.type === 'est') { question.unit = cq.unit || ''; question.answer = reveal ? cq.val : null; }
+      else if (cq.type === 'list') { question.target = cq.n || Math.min(cq.items.length, 10); question.items = reveal ? cq.items : null; }
     }
     const players = seated(room).map(p => ({
       id: p.id, name: p.name, chips: p.chips, seat: p.seat, connected: p.connected,
       wager: p.wager, locked: p.locked,
       answer: reveal ? p.answer : null,
+      estimate: reveal ? p.estimate : null,
+      foundCount: p.found ? p.found.length : 0,
       correct: reveal ? p.correct : null,
       roundDelta: reveal ? p.roundDelta : 0,
       streak: p.streak, correctCount: p.correctCount,
@@ -157,6 +192,7 @@ module.exports = function createQuiz(deps) {
     room.phase = 'wager';
     for (const p of room.players.values()) {
       p.answer = -1; p.locked = false; p.correct = null; p.roundDelta = 0; p.doubleActive = false; p.answerAt = 0;
+      p.estimate = null; p.found = []; p.guessed = [];
       if (!p.eliminated && !p.spectator) p.wager = clamp(Math.min(room.settings.minBet, p.chips), 1, p.chips); else p.wager = 0;
     }
     broadcast(room);
@@ -176,6 +212,7 @@ module.exports = function createQuiz(deps) {
 
   function maybeEarlyReveal(room) {
     if (room.phase !== 'question') return;
+    if (room.currentQ && room.currentQ.type === 'list') return; // list runs full time (keep guessing)
     const live = eligible(room);
     if (live.length > 0 && live.every(p => p.locked)) { clearTimer(room); setTimeout(() => revealAnswer(room), 400); }
   }
@@ -183,28 +220,38 @@ module.exports = function createQuiz(deps) {
   function revealAnswer(room) {
     clearTimer(room);
     room.phase = 'reveal';
-    const correctIdx = room.currentQ.k;
+    const cq = room.currentQ;
     const qTime = room.settings.questionTime * 1000;
+    const tfCorrect = cq.type === 'tf' ? (cq.tf ? 0 : 1) : null;
     for (const p of eligible(room)) {
-      const answered = p.locked && p.answer >= 0;
-      const isCorrect = answered && p.answer === correctIdx;
-      p.correct = isCorrect;
       const dm = p.doubleActive ? 2 : 1;
-      if (isCorrect) {
-        const elapsed = Math.max(0, (p.answerAt || Date.now()) - room.qStartAt);
-        const speedFrac = clamp(1 - elapsed / qTime, 0, 1);           // 1 = instant, 0 = last second
-        const streakMult = 1 + Math.min(p.streak, 5) * 0.1;          // up to +50%
-        const profit = Math.max(1, Math.round(p.wager * (1 + speedFrac) * streakMult * dm));
-        p.chips += profit; p.roundDelta = profit;
-        p.streak += 1; if (p.streak > p.bestStreak) p.bestStreak = p.streak; p.correctCount += 1;
-      } else {
-        const loss = Math.round(p.wager * dm);
-        p.chips = Math.max(0, p.chips - loss); p.roundDelta = -loss; p.streak = 0;
+      let isCorrect = false, profit = 0;
+      if (cq.type === 'mc' || cq.type === 'tf') {
+        const correctIdx = cq.type === 'tf' ? tfCorrect : cq.k;
+        isCorrect = p.locked && p.answer >= 0 && p.answer === correctIdx;
+        if (isCorrect) {
+          const speedFrac = clamp(1 - Math.max(0, (p.answerAt || Date.now()) - room.qStartAt) / qTime, 0, 1);
+          const streakMult = 1 + Math.min(p.streak, 5) * 0.1;
+          profit = Math.max(1, Math.round(p.wager * (1 + speedFrac) * streakMult * dm));
+        }
+      } else if (cq.type === 'est') {
+        if (p.estimate != null) {
+          const e = Math.abs(p.estimate - cq.val) / Math.max(1, Math.abs(cq.val));
+          const tol = cq.tol || 0.2;
+          if (e <= tol) { isCorrect = true; const closeness = 1 - e / tol; profit = Math.max(1, Math.round(p.wager * (1 + closeness) * dm)); }
+        }
+      } else if (cq.type === 'list') {
+        const target = cq.n || Math.min(cq.items.length, 10);
+        const f = p.found.length;
+        if (f > 0) { isCorrect = true; const frac = Math.min(1, f / target); profit = Math.max(1, Math.round(p.wager * frac * 2 * dm)); }
       }
+      p.correct = isCorrect;
+      if (isCorrect) { p.chips += profit; p.roundDelta = profit; p.streak += 1; if (p.streak > p.bestStreak) p.bestStreak = p.streak; p.correctCount += 1; }
+      else { const loss = Math.round(p.wager * dm); p.chips = Math.max(0, p.chips - loss); p.roundDelta = -loss; p.streak = 0; }
     }
     persist();
     broadcast(room);
-    fx(room, { type: 'reveal', answer: correctIdx });
+    fx(room, { type: 'reveal' });
     setTimer(room, 5, () => afterReveal(room));
   }
 
@@ -319,12 +366,39 @@ module.exports = function createQuiz(deps) {
 
     socket.on('quiz:answer', (data) => {
       const room = rooms.get(socket.data.quizCode); if (!room || room.phase !== 'question') return;
+      if (!room.currentQ || (room.currentQ.type !== 'mc' && room.currentQ.type !== 'tf')) return;
       const p = room.players.get(socket.id); if (!p || p.eliminated || p.spectator || p.locked) return;
-      const idx = int(data && data.index, -1); if (idx < 0 || idx > 3) return;
+      const max = room.currentQ.type === 'tf' ? 1 : 3;
+      const idx = int(data && data.index, -1); if (idx < 0 || idx > max) return;
       p.answer = idx; p.locked = true; p.answerAt = Date.now();
       fxTo(socket.id, { type: 'locked' });
       broadcast(room);
       maybeEarlyReveal(room);
+    });
+
+    socket.on('quiz:estimate', (data) => {
+      const room = rooms.get(socket.data.quizCode); if (!room || room.phase !== 'question') return;
+      if (!room.currentQ || room.currentQ.type !== 'est') return;
+      const p = room.players.get(socket.id); if (!p || p.eliminated || p.spectator || p.locked) return;
+      const v = Number(data && data.value); if (!Number.isFinite(v)) return;
+      p.estimate = v; p.locked = true; p.answerAt = Date.now();
+      fxTo(socket.id, { type: 'locked' });
+      broadcast(room);
+      maybeEarlyReveal(room);
+    });
+
+    socket.on('quiz:listguess', (data) => {
+      const room = rooms.get(socket.data.quizCode); if (!room || room.phase !== 'question') return;
+      if (!room.currentQ || room.currentQ.type !== 'list') return;
+      const p = room.players.get(socket.id); if (!p || p.eliminated || p.spectator) return;
+      const raw = (data && data.text || '').toString().slice(0, 40);
+      const g = normalize(raw); if (g.length < 2) return;
+      if (p.guessed.includes(g)) { fxTo(socket.id, { type: 'listdup' }); return; }
+      p.guessed.push(g);
+      const foundSet = new Set(p.found);
+      const m = matchListItem(raw, room.currentQ.items, foundSet);
+      if (m) { p.found.push(m); fxTo(socket.id, { type: 'listmatch', item: raw.trim(), count: p.found.length, target: room.currentQ.n || Math.min(room.currentQ.items.length, 10) }); broadcast(room); }
+      else { fxTo(socket.id, { type: 'listmiss', text: raw.trim() }); }
     });
 
     socket.on('quiz:powerup', (data) => {
@@ -337,7 +411,7 @@ module.exports = function createQuiz(deps) {
           p.powerups.double -= 1; p.doubleActive = true; fxTo(socket.id, { type: 'doubleArmed' }); broadcast(room);
         }
       } else if (type === 'fifty') {
-        if (room.phase === 'question' && !p.locked && p.powerups.fifty > 0) {
+        if (room.phase === 'question' && room.currentQ && room.currentQ.type === 'mc' && !p.locked && p.powerups.fifty > 0) {
           p.powerups.fifty -= 1;
           const wrong = [0, 1, 2, 3].filter(i => i !== room.currentQ.k);
           const remove = shuffle(wrong).slice(0, 2);

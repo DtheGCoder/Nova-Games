@@ -9,8 +9,8 @@
   <title>NOVA · Casino</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=5" />
-  <link rel="stylesheet" href="quiz.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="quiz.css?v=6" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>" />
 </head>
 <body>
@@ -225,6 +225,11 @@
           <button class="mode-opt" data-qmode="tournament"><span class="mo-ic" data-icon="trophy"></span><b>Turnier</b><small>Buy-in · bester gewinnt den Pot</small></button>
         </div>
         <div id="q-buyin-row" class="buyin-row hidden"><span>Buy-in</span><div class="seg" id="q-buyin-seg"></div></div>
+        <div class="q-setrow"><span>Spielmodus</span>
+          <div class="seg wrap" id="q-type-seg">
+            <button data-t="mixed" class="on">Gemischt</button><button data-t="mc">Quiz</button><button data-t="list">Top-Listen</button><button data-t="est">Schätzen</button><button data-t="tf">Wahr/Falsch</button>
+          </div>
+        </div>
         <div class="q-setrow"><span>Kategorie</span><select id="q-cat-sel" class="q-select"></select></div>
         <div class="q-setrow"><span>Schwierigkeit</span>
           <div class="seg" id="q-diff-seg">
@@ -288,6 +293,27 @@
       <div id="q-play" class="q-panel hidden">
         <div class="q-question-text" id="q-text"></div>
         <div class="q-options" id="q-options"></div>
+
+        <!-- estimate input -->
+        <div class="q-estimate hidden" id="q-estimate">
+          <div class="q-est-row">
+            <input type="number" id="q-est-input" inputmode="decimal" placeholder="Deine Schätzung" />
+            <span class="q-est-unit" id="q-est-unit"></span>
+            <button id="q-est-submit" class="btn btn-gold">Tippen</button>
+          </div>
+          <div class="q-est-hint" id="q-est-hint">Am nächsten dran gewinnt am meisten.</div>
+        </div>
+
+        <!-- top-list input -->
+        <div class="q-list hidden" id="q-list">
+          <div class="q-list-progress" id="q-list-progress"></div>
+          <div class="q-list-row">
+            <input type="text" id="q-list-input" placeholder="Antwort eingeben…" autocomplete="off" />
+            <button id="q-list-add" class="btn btn-emerald"><span data-icon="plus"></span></button>
+          </div>
+          <div class="q-list-found" id="q-list-found"></div>
+        </div>
+
         <div class="q-result" id="q-result"></div>
         <div class="q-powerups" id="q-powerups">
           <button id="q-pu-fifty" class="q-pu-btn"><span data-icon="info" class="bi"></span> 50:50 <em id="q-pu-fifty-n"></em></button>
@@ -390,8 +416,8 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="icons.js?v=5"></script>
-  <script src="app.js?v=5"></script>
-  <script src="quiz-client.js?v=5"></script>
+  <script src="icons.js?v=6"></script>
+  <script src="app.js?v=6"></script>
+  <script src="quiz-client.js?v=6"></script>
 </body>
 </html>
